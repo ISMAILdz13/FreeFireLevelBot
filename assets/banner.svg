@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="160" viewBox="0 0 700 160">
+  <defs>
+    <linearGradient id="bannerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF416C;stop-opacity:1">
+        <animate attributeName="offset" values="0;0.5;0" dur="4s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="50%" style="stop-color:#FF4B2B;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#4ECDC4;stop-opacity:1">
+        <animate attributeName="offset" values="1;0.5;1" dur="4s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow2">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="700" height="160" rx="25" fill="url(#bannerGrad)"/>
+  <text x="350" y="65" font-family="monospace" font-size="28" font-weight="bold" fill="white" text-anchor="middle" filter="url(#glow)">FREE FIRE LEVEL BOT</text>
+  <text x="350" y="100" font-family="monospace" font-size="14" fill="white" text-anchor="middle" opacity="0.9">Auto Level-Up 24/7 | Termux Edition | v2.0</text>
+  <circle cx="60" cy="40" r="8" fill="white" opacity="0.5">
+    <animate attributeName="opacity" values="0.5;0.1;0.5" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="r" values="8;12;8" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="640" cy="120" r="6" fill="white" opacity="0.3">
+    <animate attributeName="opacity" values="0.3;0.8;0.3" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="120" cy="130" r="4" fill="white" opacity="0.4">
+    <animate attributeName="opacity" values="0.4;0.9;0.4" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="580" cy="45" r="5" fill="white" opacity="0.3">
+    <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2.5s" repeatCount="indefinite"/>
+    <animate attributeName="r" values="5;8;5" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <rect x="200" y="115" width="300" height="4" rx="2" fill="white" opacity="0.2">
+    <animate attributeName="width" values="100;300;100" dur="5s" repeatCount="indefinite"/>
+    <animate attributeName="x" values="300;200;300" dur="5s" repeatCount="indefinite"/>
+  </rect>
+</svg>

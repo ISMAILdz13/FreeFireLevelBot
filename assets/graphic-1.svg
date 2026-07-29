@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="28" viewBox="0 0 180 28">
+  <rect width="180" height="28" rx="14" fill="#2D2D2D" stroke="#4ECDC4" stroke-width="1.5">
+    <animate attributeName="stroke" values="#4ECDC4;#FF416C;#4ECDC4" dur="3s" repeatCount="indefinite"/>
+  </rect>
+  <circle cx="14" cy="14" r="5" fill="#4ECDC4">
+    <animate attributeName="fill" values="#4ECDC4;#FF416C;#4ECDC4" dur="1.5s" repeatCount="indefinite"/>
+    <animate attributeName="r" values="5;7;5" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+  <text x="30" y="18" font-family="monospace" font-size="11" fill="#4ECDC4" font-weight="bold">SYSTEM ONLINE</text>
+</svg>

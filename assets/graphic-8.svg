@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="30" viewBox="0 0 200 30">
+  <rect width="200" height="30" rx="15" fill="#2D2D2D" stroke="#4ECDC4" stroke-width="1">
+    <animate attributeName="stroke" values="#4ECDC4;#FF416C;#4ECDC4" dur="3s" repeatCount="indefinite"/>
+  </rect>
+  <text x="100" y="20" font-family="monospace" font-size="12" fill="#4ECDC4" text-anchor="middle" font-weight="bold">@ISMAILdz13</text>
+</svg>

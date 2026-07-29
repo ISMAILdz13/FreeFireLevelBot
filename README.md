@@ -1,54 +1,7 @@
 <div align="center">
 
 <!-- Animated Banner SVG -->
-<svg xmlns="http://www.w3.org/2000/svg" width="700" height="160" viewBox="0 0 700 160">
-  <defs>
-    <linearGradient id="bannerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF416C;stop-opacity:1">
-        <animate attributeName="offset" values="0;0.5;0" dur="4s" repeatCount="indefinite"/>
-      </stop>
-      <stop offset="50%" style="stop-color:#FF4B2B;stop-opacity:1"/>
-      <stop offset="100%" style="stop-color:#4ECDC4;stop-opacity:1">
-        <animate attributeName="offset" values="1;0.5;1" dur="4s" repeatCount="indefinite"/>
-      </stop>
-    </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <filter id="glow2">
-      <feGaussianBlur stdDeviation="5" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-  <rect width="700" height="160" rx="25" fill="url(#bannerGrad)"/>
-  <text x="350" y="65" font-family="monospace" font-size="28" font-weight="bold" fill="white" text-anchor="middle" filter="url(#glow)">FREE FIRE LEVEL BOT</text>
-  <text x="350" y="100" font-family="monospace" font-size="14" fill="white" text-anchor="middle" opacity="0.9">Auto Level-Up 24/7 | Termux Edition | v2.0</text>
-  <circle cx="60" cy="40" r="8" fill="white" opacity="0.5">
-    <animate attributeName="opacity" values="0.5;0.1;0.5" dur="2s" repeatCount="indefinite"/>
-    <animate attributeName="r" values="8;12;8" dur="2s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="640" cy="120" r="6" fill="white" opacity="0.3">
-    <animate attributeName="opacity" values="0.3;0.8;0.3" dur="1.5s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="120" cy="130" r="4" fill="white" opacity="0.4">
-    <animate attributeName="opacity" values="0.4;0.9;0.4" dur="3s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="580" cy="45" r="5" fill="white" opacity="0.3">
-    <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2.5s" repeatCount="indefinite"/>
-    <animate attributeName="r" values="5;8;5" dur="2.5s" repeatCount="indefinite"/>
-  </circle>
-  <rect x="200" y="115" width="300" height="4" rx="2" fill="white" opacity="0.2">
-    <animate attributeName="width" values="100;300;100" dur="5s" repeatCount="indefinite"/>
-    <animate attributeName="x" values="300;200;300" dur="5s" repeatCount="indefinite"/>
-  </rect>
-</svg>
+![](assets/banner.svg)
 
 <!-- Badges -->
 <img src="https://img.shields.io/badge/Python-3.8+-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
@@ -58,16 +11,7 @@
 <img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge" alt="Status"/>
 
 <!-- Animated Status Badge -->
-<svg xmlns="http://www.w3.org/2000/svg" width="180" height="28" viewBox="0 0 180 28">
-  <rect width="180" height="28" rx="14" fill="#2D2D2D" stroke="#4ECDC4" stroke-width="1.5">
-    <animate attributeName="stroke" values="#4ECDC4;#FF416C;#4ECDC4" dur="3s" repeatCount="indefinite"/>
-  </rect>
-  <circle cx="14" cy="14" r="5" fill="#4ECDC4">
-    <animate attributeName="fill" values="#4ECDC4;#FF416C;#4ECDC4" dur="1.5s" repeatCount="indefinite"/>
-    <animate attributeName="r" values="5;7;5" dur="1.5s" repeatCount="indefinite"/>
-  </circle>
-  <text x="30" y="18" font-family="monospace" font-size="11" fill="#4ECDC4" font-weight="bold">SYSTEM ONLINE</text>
-</svg>
+![](assets/graphic-1.svg)
 
 </div>
 
@@ -107,89 +51,7 @@ The bot handles the full Garena authentication pipeline: guest OAuth token grant
 <!-- Architecture Overview SVG -->
 <div align="center">
 
-<svg xmlns="http://www.w3.org/2000/svg" width="680" height="380" viewBox="0 0 680 380">
-  <defs>
-    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1"/>
-      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1"/>
-    </linearGradient>
-    <linearGradient id="gameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#f093fb;stop-opacity:1"/>
-      <stop offset="100%" style="stop-color:#f5576c;stop-opacity:1"/>
-    </linearGradient>
-    <linearGradient id="loopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1"/>
-      <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1"/>
-    </linearGradient>
-    <filter id="dropShadow">
-      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-opacity="0.3"/>
-    </filter>
-  </defs>
-
-  <!-- Title -->
-  <text x="340" y="25" font-family="monospace" font-size="14" font-weight="bold" fill="#333" text-anchor="middle">System Architecture</text>
-
-  <!-- Guest Data Node -->
-  <rect x="20" y="50" width="140" height="50" rx="12" fill="url(#nodeGrad)" filter="url(#dropShadow)"/>
-  <text x="90" y="75" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">Guest Account</text>
-  <text x="90" y="90" font-family="monospace" font-size="9" fill="white" text-anchor="middle">UID + Password</text>
-
-  <!-- OAuth Node -->
-  <rect x="200" y="50" width="140" height="50" rx="12" fill="url(#nodeGrad)" filter="url(#dropShadow)"/>
-  <text x="270" y="75" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">Guest OAuth</text>
-  <text x="270" y="90" font-family="monospace" font-size="9" fill="white" text-anchor="middle">access_token + open_id</text>
-
-  <!-- MajorLogin Node -->
-  <rect x="380" y="50" width="140" height="50" rx="12" fill="url(#gameGrad)" filter="url(#dropShadow)"/>
-  <text x="450" y="75" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">MajorLogin</text>
-  <text x="450" y="90" font-family="monospace" font-size="9" fill="white" text-anchor="middle">JWT + AES Key/IV</text>
-
-  <!-- GetLoginData Node -->
-  <rect x="560" y="50" width="110" height="50" rx="12" fill="url(#gameGrad)" filter="url(#dropShadow)"/>
-  <text x="615" y="72" font-family="monospace" font-size="10" fill="white" text-anchor="middle" font-weight="bold">GetLoginData</text>
-  <text x="615" y="88" font-family="monospace" font-size="9" fill="white" text-anchor="middle">Server IP:Port</text>
-
-  <!-- Arrows row 1 -->
-  <line x1="160" y1="75" x2="195" y2="75" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
-  <line x1="340" y1="75" x2="375" y2="75" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
-  <line x1="520" y1="75" x2="555" y2="75" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
-
-  <!-- TCP Connection -->
-  <rect x="200" y="140" width="140" height="50" rx="12" fill="url(#loopGrad)" filter="url(#dropShadow)"/>
-  <text x="270" y="165" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">TCP Connect</text>
-  <text x="270" y="180" font-family="monospace" font-size="9" fill="white" text-anchor="middle">Whisper + Online</text>
-
-  <!-- Match Engine -->
-  <rect x="380" y="140" width="140" height="50" rx="12" fill="url(#loopGrad)" filter="url(#dropShadow)"/>
-  <text x="450" y="165" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">Match Engine</text>
-  <text x="450" y="180" font-family="monospace" font-size="9" fill="white" text-anchor="middle">Join → Spam → Wait</text>
-
-  <!-- Vertical arrows -->
-  <line x1="270" y1="100" x2="270" y2="135" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
-  <line x1="340" y1="165" x2="375" y2="165" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
-
-  <!-- Loop arrow back -->
-  <path d="M 450 190 Q 450 230 270 230 Q 270 230 270 195" stroke="#4ECDC4" stroke-width="2" fill="none" stroke-dasharray="5,3" marker-end="url(#arrowhead)">
-    <animate attributeName="stroke-dashoffset" values="0;-16" dur="1s" repeatCount="indefinite"/>
-  </path>
-  <text x="360" y="250" font-family="monospace" font-size="9" fill="#4ECDC4" text-anchor="middle">↻ repeat</text>
-
-  <!-- Output -->
-  <rect x="200" y="280" width="280" height="50" rx="12" fill="#2D2D2D" filter="url(#dropShadow)" stroke="#4ECDC4" stroke-width="1.5">
-    <animate attributeName="stroke" values="#4ECDC4;#FF416C;#4ECDC4" dur="2s" repeatCount="indefinite"/>
-  </rect>
-  <text x="340" y="305" font-family="monospace" font-size="12" fill="#4ECDC4" text-anchor="middle" font-weight="bold">+XP +Level ↑</text>
-  <text x="340" y="320" font-family="monospace" font-size="9" fill="#999" text-anchor="middle">account grows 24/7</text>
-
-  <line x1="340" y1="230" x2="340" y2="275" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
-
-  <!-- Arrowhead def -->
-  <defs>
-    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
-    </marker>
-  </defs>
-</svg>
+![](assets/architecture.svg)
 
 </div>
 
@@ -217,27 +79,7 @@ The bot handles the full Garena authentication pipeline: guest OAuth token grant
 <!-- Feature Icons SVG -->
 <div align="center">
 
-<svg xmlns="http://www.w3.org/2000/svg" width="600" height="40" viewBox="0 0 600 40">
-  <rect x="10" y="5" width="130" height="30" rx="15" fill="#667eea" opacity="0.9">
-    <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" repeatCount="indefinite"/>
-  </rect>
-  <text x="75" y="24" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">🤖 AUTOMATED</text>
-  
-  <rect x="155" y="5" width="130" height="30" rx="15" fill="#f5576c" opacity="0.9">
-    <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" begin="0.3s" repeatCount="indefinite"/>
-  </rect>
-  <text x="220" y="24" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">📱 TERMUX</text>
-  
-  <rect x="300" y="5" width="130" height="30" rx="15" fill="#4facfe" opacity="0.9">
-    <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" begin="0.6s" repeatCount="indefinite"/>
-  </rect>
-  <text x="365" y="24" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">🛡️ SAFE</text>
-  
-  <rect x="445" y="5" width="145" height="30" rx="15" fill="#43e97b" opacity="0.9">
-    <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" begin="0.9s" repeatCount="indefinite"/>
-  </rect>
-  <text x="517" y="24" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">⚡ FAST</text>
-</svg>
+![](assets/graphic-3.svg)
 
 </div>
 
@@ -558,92 +400,7 @@ Once connected, the match engine runs in a loop:
 
 <div align="center">
 
-<svg xmlns="http://www.w3.org/2000/svg" width="680" height="420" viewBox="0 0 680 420">
-  <defs>
-    <linearGradient id="authGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#667eea"/>
-      <stop offset="100%" style="stop-color:#764ba2"/>
-    </linearGradient>
-    <linearGradient id="authGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#f093fb"/>
-      <stop offset="100%" style="stop-color:#f5576c"/>
-    </linearGradient>
-    <linearGradient id="authGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#4facfe"/>
-      <stop offset="100%" style="stop-color:#00f2fe"/>
-    </linearGradient>
-    <linearGradient id="authGrad4" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#43e97b"/>
-      <stop offset="100%" style="stop-color:#38f9d7"/>
-    </linearGradient>
-    <filter id="shadow2">
-      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-opacity="0.3"/>
-    </filter>
-  </defs>
-
-  <!-- Title -->
-  <text x="340" y="25" font-family="monospace" font-size="14" font-weight="bold" fill="#333" text-anchor="middle">Authentication Pipeline</text>
-
-  <!-- Step 1: OAuth -->
-  <rect x="20" y="50" width="160" height="70" rx="15" fill="url(#authGrad1)" filter="url(#shadow2)"/>
-  <text x="100" y="75" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 1: OAuth</text>
-  <text x="100" y="93" font-family="monospace" font-size="8" fill="white" text-anchor="middle">connect.garena.com</text>
-  <text x="100" y="107" font-family="monospace" font-size="8" fill="white" text-anchor="middle">→ access_token</text>
-
-  <!-- Step 2: MajorLogin -->
-  <rect x="220" y="50" width="160" height="70" rx="15" fill="url(#authGrad2)" filter="url(#shadow2)"/>
-  <text x="300" y="75" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 2: MajorLogin</text>
-  <text x="300" y="93" font-family="monospace" font-size="8" fill="white" text-anchor="middle">loginbp.ggpolarbear.com</text>
-  <text x="300" y="107" font-family="monospace" font-size="8" fill="white" text-anchor="middle">→ JWT + AES Key/IV</text>
-
-  <!-- Step 3: GetLoginData -->
-  <rect x="420" y="50" width="160" height="70" rx="15" fill="url(#authGrad3)" filter="url(#shadow2)"/>
-  <text x="500" y="75" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 3: LoginData</text>
-  <text x="500" y="93" font-family="monospace" font-size="8" fill="white" text-anchor="middle">clientbp.ggpolarbear.com</text>
-  <text x="500" y="107" font-family="monospace" font-size="8" fill="white" text-anchor="middle">→ Server IP:Port</text>
-
-  <!-- Arrows between steps -->
-  <line x1="180" y1="85" x2="215" y2="85" stroke="#666" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="380" y1="85" x2="415" y2="85" stroke="#666" stroke-width="2.5" marker-end="url(#ah)"/>
-
-  <!-- Step 4: TCP -->
-  <rect x="120" y="170" width="160" height="70" rx="15" fill="url(#authGrad4)" filter="url(#shadow2)"/>
-  <text x="200" y="195" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 4: TCP</text>
-  <text x="200" y="213" font-family="monospace" font-size="8" fill="white" text-anchor="middle">Whisper + Online</text>
-  <text x="200" y="227" font-family="monospace" font-size="8" fill="white" text-anchor="middle">socket connection</text>
-
-  <!-- Step 5: Match Loop -->
-  <rect x="340" y="170" width="160" height="70" rx="15" fill="url(#authGrad4)" filter="url(#shadow2)"/>
-  <text x="420" y="195" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 5: Loop</text>
-  <text x="420" y="213" font-family="monospace" font-size="8" fill="white" text-anchor="middle">Join → Start</text>
-  <text x="420" y="227" font-family="monospace" font-size="8" fill="white" text-anchor="middle">→ Wait → Leave</text>
-
-  <!-- Arrows down -->
-  <line x1="500" y1="120" x2="200" y2="165" stroke="#666" stroke-width="2" marker-end="url(#ah)" stroke-dasharray="5,3"/>
-  <line x1="280" y1="205" x2="335" y2="205" stroke="#666" stroke-width="2.5" marker-end="url(#ah)"/>
-
-  <!-- Encryption layer -->
-  <rect x="220" y="290" width="240" height="50" rx="12" fill="#2D2D2D" stroke="#FF416C" stroke-width="1.5" filter="url(#shadow2)">
-    <animate attributeName="stroke" values="#FF416C;#4ECDC4;#FF416C" dur="2s" repeatCount="indefinite"/>
-  </rect>
-  <text x="340" y="315" font-family="monospace" font-size="11" fill="#FF416C" text-anchor="middle" font-weight="bold">AES-CBC Encryption</text>
-  <text x="340" y="330" font-family="monospace" font-size="8" fill="#999" text-anchor="middle">All packets encrypted with key/IV from MajorLogin</text>
-
-  <!-- Connection -->
-  <line x1="340" y1="340" x2="340" y2="370" stroke="#666" stroke-width="2" marker-end="url(#ah)"/>
-
-  <!-- Final Output -->
-  <rect x="220" y="370" width="240" height="35" rx="10" fill="#2D2D2D" stroke="#43e97b" stroke-width="1.5">
-    <animate attributeName="stroke" values="#43e97b;#4facfe;#43e97b" dur="2s" repeatCount="indefinite"/>
-  </rect>
-  <text x="340" y="392" font-family="monospace" font-size="11" fill="#43e97b" text-anchor="middle" font-weight="bold">✓ Connected & Running</text>
-
-  <defs>
-    <marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
-    </marker>
-  </defs>
-</svg>
+![](assets/architecture-1.svg)
 
 </div>
 
@@ -653,76 +410,7 @@ Once connected, the match engine runs in a loop:
 
 <div align="center">
 
-<svg xmlns="http://www.w3.org/2000/svg" width="680" height="300" viewBox="0 0 680 300">
-  <defs>
-    <filter id="glow3">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <marker id="ah2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
-    </marker>
-  </defs>
-
-  <text x="340" y="25" font-family="monospace" font-size="14" font-weight="bold" fill="#333" text-anchor="middle">Match Engine State Machine</text>
-
-  <!-- IDLE -->
-  <circle cx="80" cy="100" r="40" fill="#667eea" opacity="0.9" filter="url(#glow3)">
-    <animate attributeName="opacity" values="0.9;0.6;0.9" dur="2s" repeatCount="indefinite"/>
-  </circle>
-  <text x="80" y="95" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">IDLE</text>
-  <text x="80" y="110" font-family="monospace" font-size="8" fill="white" text-anchor="middle">waiting</text>
-
-  <!-- JOINING -->
-  <circle cx="230" cy="100" r="40" fill="#f5576c" opacity="0.9" filter="url(#glow3)">
-    <animate attributeName="opacity" values="0.9;0.6;0.9" dur="2s" begin="0.4s" repeatCount="indefinite"/>
-  </circle>
-  <text x="230" y="95" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">JOINING</text>
-  <text x="230" y="110" font-family="monospace" font-size="8" fill="white" text-anchor="middle">team code</text>
-
-  <!-- SPAMMING -->
-  <circle cx="380" cy="100" r="40" fill="#FF4B2B" opacity="0.9" filter="url(#glow3)">
-    <animate attributeName="opacity" values="0.9;0.6;0.9" dur="2s" begin="0.8s" repeatCount="indefinite"/>
-  </circle>
-  <text x="380" y="95" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">SPAM</text>
-  <text x="380" y="110" font-family="monospace" font-size="8" fill="white" text-anchor="middle">start pkt</text>
-
-  <!-- WAITING -->
-  <circle cx="530" cy="100" r="40" fill="#4facfe" opacity="0.9" filter="url(#glow3)">
-    <animate attributeName="opacity" values="0.9;0.6;0.9" dur="2s" begin="1.2s" repeatCount="indefinite"/>
-  </circle>
-  <text x="530" y="95" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">WAITING</text>
-  <text x="530" y="110" font-family="monospace" font-size="8" fill="white" text-anchor="middle">match ends</text>
-
-  <!-- LEAVING -->
-  <circle cx="380" cy="220" r="40" fill="#43e97b" opacity="0.9" filter="url(#glow3)">
-    <animate attributeName="opacity" values="0.9;0.6;0.9" dur="2s" begin="1.6s" repeatCount="indefinite"/>
-  </circle>
-  <text x="380" y="215" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">LEAVING</text>
-  <text x="380" y="230" font-family="monospace" font-size="8" fill="white" text-anchor="middle">exit team</text>
-
-  <!-- Arrows -->
-  <line x1="120" y1="100" x2="190" y2="100" stroke="#666" stroke-width="2" marker-end="url(#ah2)"/>
-  <line x1="270" y1="100" x2="340" y2="100" stroke="#666" stroke-width="2" marker-end="url(#ah2)"/>
-  <line x1="420" y1="100" x2="490" y2="100" stroke="#666" stroke-width="2" marker-end="url(#ah2)"/>
-  
-  <!-- WAITING -> LEAVING -->
-  <path d="M 530 140 Q 530 180 420 220" stroke="#666" stroke-width="2" fill="none" marker-end="url(#ah2)"/>
-  
-  <!-- LEAVING -> IDLE (loop back) -->
-  <path d="M 340 220 Q 200 220 80 140" stroke="#4ECDC4" stroke-width="2.5" fill="none" stroke-dasharray="6,4" marker-end="url(#ah2)">
-    <animate attributeName="stroke-dashoffset" values="0;-20" dur="1s" repeatCount="indefinite"/>
-  </path>
-  <text x="200" y="260" font-family="monospace" font-size="10" fill="#4ECDC4" text-anchor="middle">↻ repeat cycle</text>
-
-  <!-- Labels on arrows -->
-  <text x="155" y="90" font-family="monospace" font-size="8" fill="#999" text-anchor="middle">join_delay</text>
-  <text x="305" y="90" font-family="monospace" font-size="8" fill="#999" text-anchor="middle">start spam</text>
-  <text x="455" y="90" font-family="monospace" font-size="8" fill="#999" text-anchor="middle">wait_after</text>
-</svg>
+![](assets/graphic-5.svg)
 
 </div>
 
@@ -757,47 +445,7 @@ The bot distinguishes between different failure types to avoid false positives:
 <!-- Ban Detection Flow SVG -->
 <div align="center">
 
-<svg xmlns="http://www.w3.org/2000/svg" width="600" height="220" viewBox="0 0 600 220">
-  <defs>
-    <marker id="ah3" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
-    </marker>
-  </defs>
-
-  <text x="300" y="25" font-family="monospace" font-size="13" font-weight="bold" fill="#333" text-anchor="middle">Ban Detection Logic</text>
-
-  <!-- Check node -->
-  <rect x="220" y="45" width="160" height="40" rx="10" fill="#2D2D2D" stroke="#4ECDC4" stroke-width="1.5"/>
-  <text x="300" y="70" font-family="monospace" font-size="11" fill="#4ECDC4" text-anchor="middle" font-weight="bold">Check HTTP Status</text>
-
-  <!-- 200 -->
-  <rect x="30" y="130" width="110" height="40" rx="10" fill="#43e97b" opacity="0.9"/>
-  <text x="85" y="155" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">200 = OK</text>
-
-  <!-- 503 -->
-  <rect x="160" y="130" width="110" height="40" rx="10" fill="#FFA500" opacity="0.9">
-    <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" repeatCount="indefinite"/>
-  </rect>
-  <text x="215" y="155" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">503 = DOWN</text>
-
-  <!-- 400/403 -->
-  <rect x="290" y="130" width="110" height="40" rx="10" fill="#f5576c" opacity="0.9">
-    <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" begin="0.5s" repeatCount="indefinite"/>
-  </rect>
-  <text x="345" y="155" font-family="monospace" font-size="11" fill="white" text-anchor="middle" font-weight="bold">403 = BAN</text>
-
-  <!-- OAuth error -->
-  <rect x="420" y="130" width="150" height="40" rx="10" fill="#2D2D2D" stroke="#f5576c" stroke-width="1.5">
-    <animate attributeName="stroke" values="#f5576c;#FF416C;#f5576c" dur="1.5s" repeatCount="indefinite"/>
-  </rect>
-  <text x="495" y="155" font-family="monospace" font-size="11" fill="#f5576c" text-anchor="middle" font-weight="bold">DEAD</text>
-
-  <!-- Arrows -->
-  <line x1="250" y1="85" x2="85" y2="125" stroke="#666" stroke-width="1.5" marker-end="url(#ah3)"/>
-  <line x1="280" y1="85" x2="215" y2="125" stroke="#666" stroke-width="1.5" marker-end="url(#ah3)"/>
-  <line x1="320" y1="85" x2="345" y2="125" stroke="#666" stroke-width="1.5" marker-end="url(#ah3)"/>
-  <line x1="350" y1="85" x2="495" y2="125" stroke="#666" stroke-width="1.5" marker-end="url(#ah3)"/>
-</svg>
+![](assets/status-badge.svg)
 
 </div>
 
@@ -996,39 +644,7 @@ This was a bug in v1.0 where the bot didn't handle MajorLogin failures. Fixed in
 <div align="center">
 
 <!-- Animated Stats SVG -->
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="100" viewBox="0 0 640 100">
-  <defs>
-    <linearGradient id="statGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#4ECDC4;stop-opacity:0.2"/>
-      <stop offset="100%" style="stop-color:#4ECDC4;stop-opacity:0"/>
-    </linearGradient>
-  </defs>
-
-  <!-- Stat 1 -->
-  <rect x="10" y="10" width="150" height="80" rx="12" fill="url(#statGrad)" stroke="#4ECDC4" stroke-width="1"/>
-  <text x="85" y="40" font-family="monospace" font-size="28" font-weight="bold" fill="#4ECDC4" text-anchor="middle">7</text>
-  <text x="85" y="65" font-family="monospace" font-size="10" fill="#999" text-anchor="middle">Files in src/</text>
-
-  <!-- Stat 2 -->
-  <rect x="170" y="10" width="150" height="80" rx="12" fill="url(#statGrad)" stroke="#FF416C" stroke-width="1"/>
-  <text x="245" y="40" font-family="monospace" font-size="28" font-weight="bold" fill="#FF416C" text-anchor="middle">5</text>
-  <text x="245" y="65" font-family="monospace" font-size="10" fill="#999" text-anchor="middle">Auth Steps</text>
-
-  <!-- Stat 3 -->
-  <rect x="330" y="10" width="150" height="80" rx="12" fill="url(#statGrad)" stroke="#4facfe" stroke-width="1"/>
-  <text x="405" y="40" font-family="monospace" font-size="28" font-weight="bold" fill="#4facfe" text-anchor="middle">∞</text>
-  <text x="405" y="65" font-family="monospace" font-size="10" fill="#999" text-anchor="middle">Cycles</text>
-
-  <!-- Stat 4 -->
-  <rect x="490" y="10" width="140" height="80" rx="12" fill="url(#statGrad)" stroke="#43e97b" stroke-width="1"/>
-  <text x="560" y="40" font-family="monospace" font-size="28" font-weight="bold" fill="#43e97b" text-anchor="middle">24/7</text>
-  <text x="560" y="65" font-family="monospace" font-size="10" fill="#999" text-anchor="middle">Uptime</text>
-
-  <!-- Animated pulse line -->
-  <line x1="10" y1="95" x2="630" y2="95" stroke="#4ECDC4" stroke-width="0.5" opacity="0.3">
-    <animate attributeName="opacity" values="0.3;0.6;0.3" dur="2s" repeatCount="indefinite"/>
-  </line>
-</svg>
+![](assets/graphic-7.svg)
 
 </div>
 
@@ -1090,12 +706,7 @@ Contributions are welcome! Here's how you can help:
 
 Developed by **ISMAILdz13**
 
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="30" viewBox="0 0 200 30">
-  <rect width="200" height="30" rx="15" fill="#2D2D2D" stroke="#4ECDC4" stroke-width="1">
-    <animate attributeName="stroke" values="#4ECDC4;#FF416C;#4ECDC4" dur="3s" repeatCount="indefinite"/>
-  </rect>
-  <text x="100" y="20" font-family="monospace" font-size="12" fill="#4ECDC4" text-anchor="middle" font-weight="bold">@ISMAILdz13</text>
-</svg>
+![](assets/graphic-8.svg)
 
 </div>
 
@@ -1110,20 +721,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 <div align="center">
 
 <!-- Footer SVG -->
-<svg xmlns="http://www.w3.org/2000/svg" width="600" height="60" viewBox="0 0 600 60">
-  <defs>
-    <linearGradient id="footerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#FF416C;stop-opacity:0">
-        <animate attributeName="offset" values="0;1;0" dur="5s" repeatCount="indefinite"/>
-      </stop>
-      <stop offset="100%" style="stop-color:#4ECDC4;stop-opacity:0">
-        <animate attributeName="offset" values="1;0;1" dur="5s" repeatCount="indefinite"/>
-      </stop>
-    </linearGradient>
-  </defs>
-  <rect x="50" y="20" width="500" height="2" rx="1" fill="url(#footerGrad)"/>
-  <text x="300" y="45" font-family="monospace" font-size="11" fill="#666" text-anchor="middle">Made with Python | Powered by Garena API | Runs on Termux</text>
-</svg>
+![](assets/footer.svg)
 
 ⭐ **Star this repo if it helped you!** ⭐
 

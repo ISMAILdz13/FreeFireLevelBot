@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="420" viewBox="0 0 680 420">
+  <defs>
+    <linearGradient id="authGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+    <linearGradient id="authGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f093fb"/>
+      <stop offset="100%" style="stop-color:#f5576c"/>
+    </linearGradient>
+    <linearGradient id="authGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4facfe"/>
+      <stop offset="100%" style="stop-color:#00f2fe"/>
+    </linearGradient>
+    <linearGradient id="authGrad4" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#43e97b"/>
+      <stop offset="100%" style="stop-color:#38f9d7"/>
+    </linearGradient>
+    <filter id="shadow2">
+      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Title -->
+  <text x="340" y="25" font-family="monospace" font-size="14" font-weight="bold" fill="#333" text-anchor="middle">Authentication Pipeline</text>
+
+  <!-- Step 1: OAuth -->
+  <rect x="20" y="50" width="160" height="70" rx="15" fill="url(#authGrad1)" filter="url(#shadow2)"/>
+  <text x="100" y="75" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 1: OAuth</text>
+  <text x="100" y="93" font-family="monospace" font-size="8" fill="white" text-anchor="middle">connect.garena.com</text>
+  <text x="100" y="107" font-family="monospace" font-size="8" fill="white" text-anchor="middle">→ access_token</text>
+
+  <!-- Step 2: MajorLogin -->
+  <rect x="220" y="50" width="160" height="70" rx="15" fill="url(#authGrad2)" filter="url(#shadow2)"/>
+  <text x="300" y="75" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 2: MajorLogin</text>
+  <text x="300" y="93" font-family="monospace" font-size="8" fill="white" text-anchor="middle">loginbp.ggpolarbear.com</text>
+  <text x="300" y="107" font-family="monospace" font-size="8" fill="white" text-anchor="middle">→ JWT + AES Key/IV</text>
+
+  <!-- Step 3: GetLoginData -->
+  <rect x="420" y="50" width="160" height="70" rx="15" fill="url(#authGrad3)" filter="url(#shadow2)"/>
+  <text x="500" y="75" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 3: LoginData</text>
+  <text x="500" y="93" font-family="monospace" font-size="8" fill="white" text-anchor="middle">clientbp.ggpolarbear.com</text>
+  <text x="500" y="107" font-family="monospace" font-size="8" fill="white" text-anchor="middle">→ Server IP:Port</text>
+
+  <!-- Arrows between steps -->
+  <line x1="180" y1="85" x2="215" y2="85" stroke="#666" stroke-width="2.5" marker-end="url(#ah)"/>
+  <line x1="380" y1="85" x2="415" y2="85" stroke="#666" stroke-width="2.5" marker-end="url(#ah)"/>
+
+  <!-- Step 4: TCP -->
+  <rect x="120" y="170" width="160" height="70" rx="15" fill="url(#authGrad4)" filter="url(#shadow2)"/>
+  <text x="200" y="195" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 4: TCP</text>
+  <text x="200" y="213" font-family="monospace" font-size="8" fill="white" text-anchor="middle">Whisper + Online</text>
+  <text x="200" y="227" font-family="monospace" font-size="8" fill="white" text-anchor="middle">socket connection</text>
+
+  <!-- Step 5: Match Loop -->
+  <rect x="340" y="170" width="160" height="70" rx="15" fill="url(#authGrad4)" filter="url(#shadow2)"/>
+  <text x="420" y="195" font-family="monospace" font-size="12" fill="white" text-anchor="middle" font-weight="bold">Step 5: Loop</text>
+  <text x="420" y="213" font-family="monospace" font-size="8" fill="white" text-anchor="middle">Join → Start</text>
+  <text x="420" y="227" font-family="monospace" font-size="8" fill="white" text-anchor="middle">→ Wait → Leave</text>
+
+  <!-- Arrows down -->
+  <line x1="500" y1="120" x2="200" y2="165" stroke="#666" stroke-width="2" marker-end="url(#ah)" stroke-dasharray="5,3"/>
+  <line x1="280" y1="205" x2="335" y2="205" stroke="#666" stroke-width="2.5" marker-end="url(#ah)"/>
+
+  <!-- Encryption layer -->
+  <rect x="220" y="290" width="240" height="50" rx="12" fill="#2D2D2D" stroke="#FF416C" stroke-width="1.5" filter="url(#shadow2)">
+    <animate attributeName="stroke" values="#FF416C;#4ECDC4;#FF416C" dur="2s" repeatCount="indefinite"/>
+  </rect>
+  <text x="340" y="315" font-family="monospace" font-size="11" fill="#FF416C" text-anchor="middle" font-weight="bold">AES-CBC Encryption</text>
+  <text x="340" y="330" font-family="monospace" font-size="8" fill="#999" text-anchor="middle">All packets encrypted with key/IV from MajorLogin</text>
+
+  <!-- Connection -->
+  <line x1="340" y1="340" x2="340" y2="370" stroke="#666" stroke-width="2" marker-end="url(#ah)"/>
+
+  <!-- Final Output -->
+  <rect x="220" y="370" width="240" height="35" rx="10" fill="#2D2D2D" stroke="#43e97b" stroke-width="1.5">
+    <animate attributeName="stroke" values="#43e97b;#4facfe;#43e97b" dur="2s" repeatCount="indefinite"/>
+  </rect>
+  <text x="340" y="392" font-family="monospace" font-size="11" fill="#43e97b" text-anchor="middle" font-weight="bold">✓ Connected & Running</text>
+
+  <defs>
+    <marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+  </defs>
+</svg>
