@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  ffbot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ff-like-bot
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    environment:
+      - FFBOT_DEBUG=false
+      - FFBOT_TARGET_REGION=ME
+    command: python main.py like --target ${TARGET_UID} --count ${LIKE_COUNT:-100} --region ME
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ffbot-dashboard
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    command: uvicorn web.dashboard:app --host 0.0.0.0 --port 8080
+    profiles:
+      - dashboard

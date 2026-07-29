@@ -1,0 +1,106 @@
+# Free Fire Server Endpoints by Region
+
+regions:
+  ME:
+    name: "Middle East / MENA"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.me.freefiremobile.com"
+    cdn_base: "https://cdn.me.freefiremobile.com"
+    auth_region: "ME"
+    timezone: "Asia/Dubai"
+
+  IND:
+    name: "India"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.ind.freefiremobile.com"
+    cdn_base: "https://cdn.ind.freefiremobile.com"
+    auth_region: "IND"
+    timezone: "Asia/Kolkata"
+
+  BR:
+    name: "Brazil"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.us.freefiremobile.com"
+    cdn_base: "https://cdn.us.freefiremobile.com"
+    auth_region: "BR"
+    timezone: "America/Sao_Paulo"
+
+  US:
+    name: "United States"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.us.freefiremobile.com"
+    cdn_base: "https://cdn.us.freefiremobile.com"
+    auth_region: "US"
+    timezone: "America/New_York"
+
+  EU:
+    name: "Europe"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.eu.freefiremobile.com"
+    cdn_base: "https://cdn.eu.freefiremobile.com"
+    auth_region: "EU"
+    timezone: "Europe/London"
+
+  SG:
+    name: "Singapore"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.sg.freefiremobile.com"
+    cdn_base: "https://cdn.sg.freefiremobile.com"
+    auth_region: "SG"
+    timezone: "Asia/Singapore"
+
+  TH:
+    name: "Thailand"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.th.freefiremobile.com"
+    cdn_base: "https://cdn.th.freefiremobile.com"
+    auth_region: "TH"
+    timezone: "Asia/Bangkok"
+
+  VN:
+    name: "Vietnam"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.vn.freefiremobile.com"
+    cdn_base: "https://cdn.vn.freefiremobile.com"
+    auth_region: "VN"
+    timezone: "Asia/Ho_Chi_Minh"
+
+  ID:
+    name: "Indonesia"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.id.freefiremobile.com"
+    cdn_base: "https://cdn.id.freefiremobile.com"
+    auth_region: "ID"
+    timezone: "Asia/Jakarta"
+
+  BD:
+    name: "Bangladesh"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.bd.freefiremobile.com"
+    cdn_base: "https://cdn.bd.freefiremobile.com"
+    auth_region: "BD"
+    timezone: "Asia/Dhaka"
+
+  PK:
+    name: "Pakistan"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.pk.freefiremobile.com"
+    cdn_base: "https://cdn.pk.freefiremobile.com"
+    auth_region: "PK"
+    timezone: "Asia/Karachi"
+
+  CIS:
+    name: "CIS"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.cis.freefiremobile.com"
+    cdn_base: "https://cdn.cis.freefiremobile.com"
+    auth_region: "CIS"
+    timezone: "Europe/Moscow"
+
+  TW:
+    name: "Taiwan"
+    oauth_url: "https://authinternal.api.freefiremobile.com/oauth/token"
+    api_base: "https://client.tw.freefiremobile.com"
+    cdn_base: "https://cdn.tw.freefiremobile.com"
+    auth_region: "TW"
+    timezone: "Asia/Taipei"

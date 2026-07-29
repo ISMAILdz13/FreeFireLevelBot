@@ -1,0 +1,29 @@
+[
+  {
+    "uid": "5842511863",
+    "password": "NAJMI-OSV4YUON1-CORE",
+    "name": "BOT5S8F7S",
+    "region": "ME",
+    "status": "registered",
+    "open_id": "14c795ca2e7da7c7ae5c1c86ebcf122a",
+    "access_token": "4b2ae84cedc48bb428c32a2c51701cdd72ce456c9b76d0719ae7c07580ce8e76"
+  },
+  {
+    "uid": "5842511867",
+    "password": "NAJMI-OIZBSXSBT-CORE",
+    "name": "BOTWGC5RT",
+    "region": "ME",
+    "status": "registered",
+    "open_id": "6c25c9e6ab74750a16c8c62002b62bf0",
+    "access_token": "b2d361e04a206f8481e0cd7a510cb19d083e7960cd6817bf818cfcebf8ba7b3e"
+  },
+  {
+    "uid": "5842511864",
+    "password": "NAJMI-XQTERHN9N-CORE",
+    "name": "BOT91X0NN",
+    "region": "ME",
+    "status": "registered",
+    "open_id": "5b492ac52f22bd3ee949052b727d45fa",
+    "access_token": "e0bc39a32f11ad3bc1ddff6eb57c4468af88a692109b5255e7806cbcfb21b4d7"
+  }
+]

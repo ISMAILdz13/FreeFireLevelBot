@@ -1,0 +1,8 @@
+# Level Bot Dependencies
+# (in addition to main requirements.txt)
+
+httpx>=0.27.0
+pycryptodome>=3.20.0
+protobuf>=5.26.0
+protobuf-decoder>=1.0.0
+PyJWT>=2.8.0

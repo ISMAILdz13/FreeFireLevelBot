@@ -1,0 +1,73 @@
+# Free Fire Like Bot Pro - Configuration
+# MENA Server Optimized
+
+bot:
+  name: "FF-LikeBot-Pro"
+  version: "2.0.0"
+  debug: false
+  max_workers: 1
+  request_timeout: 45
+
+server:
+  target_region: "ME"
+  region_name: "MENA"
+  game_version: "OB54"
+  client_version: "1.126.2"
+  user_agent: "FreeFireMobile/1.104.1 (Android 13; SM-G998B)"
+
+encryption:
+  # PRIMARY KEYS - UPDATE THESE VIA FRIDA EXTRACTION
+  main_key: "Yg&tc%DEuh6%Zc^8"
+  main_iv: "7d1e4f8a9c2b5e6d"
+  key_rotation: true
+  fallback_keys:
+    - key: "FreeFire2024Key!!"
+      iv: "InitVector2024!!"
+    - key: "GarenaFFME2024!!"
+      iv: "MENAServer2024!!"
+
+rate_limiting:
+  requests_per_second: 8
+  burst_size: 15
+  guest_cooldown_seconds: 5
+  target_daily_limit: 500
+  global_daily_limit: 50000
+
+streak:
+  default_count: 100
+  max_streak: 1000
+  delay_between_likes_ms: 10000
+  jitter_percent: 20
+
+proxies:
+  enabled: false
+  rotation_strategy: "round_robin"  # round_robin, random, least_used
+  proxy_file: "config/proxies.txt"
+  test_url: "https://httpbin.org/ip"
+  test_timeout: 10
+
+guests:
+  db_path: "data/guests.db"
+  batch_size: 100
+  health_check_interval: 3600
+  auto_remove_dead: true
+  max_age_days: 30
+
+jwt:
+  cache_enabled: true
+  cache_db: "data/jwt_cache.db"
+  ttl_hours: 20
+  refresh_before_expiry_minutes: 60
+
+logging:
+  level: "INFO"
+  file: "data/bot.log"
+  max_size_mb: 50
+  backup_count: 5
+  format: "%(asctime)s | %(levelname)-8s | [%(name)s] %(message)s"
+
+dashboard:
+  enabled: false
+  host: "0.0.0.0"
+  port: 8080
+  auth_token: "change-me-in-production"

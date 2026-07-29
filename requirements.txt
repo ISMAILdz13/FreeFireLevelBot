@@ -1,0 +1,43 @@
+# Free Fire Like Bot Pro - Dependencies
+# Python 3.10+
+
+# Async HTTP
+httpx[http2]>=0.27.0
+h2>=4.1.0
+
+# Cryptography
+pycryptodome>=3.20.0
+cryptography>=42.0.0
+
+# Protobuf
+protobuf>=5.26.0
+
+# Database
+aiosqlite>=0.20.0
+
+# Config & Utils
+pyyaml>=6.0.1
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+
+# CLI & UI
+rich>=13.7.0
+typer>=0.12.0
+click>=8.1.0
+
+# Async
+anyio>=4.3.0
+asyncio-throttle>=1.0.2
+
+# Web Dashboard (optional)
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+jinja2>=3.1.0
+
+# Testing
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
+
+# Development
+# frida>=16.2.0  # Install separately: pip install frida-tools
