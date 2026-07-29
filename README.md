@@ -104,7 +104,7 @@ pkg install python git -y
 pip install httpx pycryptodome protobuf protobuf-decoder PyJWT
 
 # 4. Clone the repo
-git clone https://github.com/ISMAILdz13/ff-level-bot.git
+git clone https://github.com/ISMAILdz13/FreeFireLevelBot.git
 cd ff-level-bot
 
 # 5. Or use the setup script
@@ -117,7 +117,7 @@ python level_menu.py
 
 ### One-Liner Install
 ```bash
-pkg update -y && pkg install python git -y && pip install httpx pycryptodome protobuf protobuf-decoder PyJWT && git clone https://github.com/ISMAILdz13/ff-level-bot.git && cd ff-level-bot && python level_menu.py
+pkg update -y && pkg install python git -y && pip install httpx pycryptodome protobuf protobuf-decoder PyJWT && git clone https://github.com/ISMAILdz13/FreeFireLevelBot.git && cd ff-level-bot && python level_menu.py
 ```
 
 </details>
@@ -132,7 +132,7 @@ pkg update -y && pkg install python git -y && pip install httpx pycryptodome pro
 python3 --version
 
 # 2. Clone the repo
-git clone https://github.com/ISMAILdz13/ff-level-bot.git
+git clone https://github.com/ISMAILdz13/FreeFireLevelBot.git
 cd ff-level-bot
 
 # 3. Create virtual environment (optional but recommended)
@@ -155,7 +155,7 @@ python3 level_menu.py
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/ISMAILdz13/ff-level-bot.git
+git clone https://github.com/ISMAILdz13/FreeFireLevelBot.git
 cd ff-level-bot
 
 # 2. Build the container
