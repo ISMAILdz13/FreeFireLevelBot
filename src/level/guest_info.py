@@ -168,7 +168,7 @@ class GuestInfo:
             "Content-Type": "application/x-www-form-urlencoded",
             "X-Unity-Version": "2018.4.11f1",
             "X-GA": "v1 1",
-            "ReleaseVersion": "Ob51",
+            "ReleaseVersion": "OB54",
         }
 
         for attempt in range(3):
