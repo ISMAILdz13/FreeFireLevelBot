@@ -218,7 +218,7 @@ regions:
   - SG
 endpoints:
   oauth: "https://100067.connect.garena.com/oauth/guest/token/grant"
-  major_login: "https://loginbp.ggpolarbear.com/MajorLogin"
+  major_login: "https://loginbp.ggwhitehawk.com/MajorLogin" (primary, with ggpolarbear/ggblueshark fallback)
   login_data: "https://clientbp.ggpolarbear.com/GetLoginData"
   player_info: "https://clientbp.ggpolarbear.com/GetPlayerPersonalShow"
 ```
@@ -325,7 +325,7 @@ ff-level-bot/
 │   ├── MajorLoginRes_pb2.py   # MajorLogin response protobuf
 │   └── jwt_generator_pb2.py
 │
-├── OB54-TCP-BOT/
+# (moved to separate repo)
 │   └── Pb2/
 │       ├── data_pb2.py
 │       ├── dev_generator_pb2.py
@@ -369,7 +369,7 @@ ff-level-bot/
 The bot sends a POST request to `https://100067.connect.garena.com/oauth/guest/token/grant` with the guest UID and password. If valid, Garena returns an `access_token` and `open_id`.
 
 #### 2. MajorLogin
-Using the access_token and open_id, the bot constructs an encrypted protobuf payload using a fixed template. The payload is encrypted with AES-CBC using a hardcoded key/IV, then sent to `https://loginbp.ggpolarbear.com/MajorLogin`. The response contains:
+Using the access_token and open_id, the bot constructs an encrypted protobuf payload using a fixed template. The payload is encrypted with AES-CBC using a hardcoded key/IV, then sent to `https://loginbp.ggwhitehawk.com/MajorLogin` (with ggpolarbear/ggblueshark fallback). The response contains:
 - **JWT token** — for authenticating with game servers
 - **AES key + IV** — for encrypting TCP packets
 - **Timestamp** — server time for token construction
@@ -528,7 +528,7 @@ The bot uses the same authentication flow as the official Free Fire client. Howe
 All requests go to `ggpolarbear.com` (Garena's current game API):
 - OAuth: `100067.connect.garena.com`
 - MajorLogin: `loginbp.ggpolarbear.com`
-- GetLoginData: `clientbp.ggpolarbear.com` (or dynamic URL from MajorLogin response)
+- GetLoginData: dynamic URL from MajorLogin response (fallback: `clientbp.ggpolarbear.com`)
 - PlayerInfo: `clientbp.ggpolarbear.com`
 
 </details>
