@@ -58,6 +58,7 @@ class MatchEngine:
         join_delay: float = 2.0,
         leave_delay: float = 2.0,
         cycle_delay: float = 2.0,
+        uid: int = 0,
     ):
         self.conn = connection
         self.pb = packet_builder
@@ -67,6 +68,7 @@ class MatchEngine:
         self.join_delay = join_delay
         self.leave_delay = leave_delay
         self.cycle_delay = cycle_delay
+        self.uid = uid
 
         self.stats = MatchStats()
         self._running = False
@@ -152,7 +154,7 @@ class MatchEngine:
 
         # ── Step 2: Start match (spam start packets) ──
         self.stats.current_state = "matching"
-        start_packet = self.pb.start_match()
+        start_packet = self.pb.start_match(self.uid)
         end_time = time.time() + self.spam_duration
         packets_sent = 0
 
@@ -166,7 +168,7 @@ class MatchEngine:
 
         if self._stop_requested:
             # Still try to leave before stopping
-            leave_packet = self.pb.leave_team()
+            leave_packet = self.pb.leave_team(self.uid)
             try:
                 await self.conn.send_whisper(leave_packet)
             except Exception:
@@ -181,7 +183,7 @@ class MatchEngine:
         # ── Step 4: Leave team ──
         self.stats.current_state = "leaving"
         self.stats.leave_attempts += 1
-        leave_packet = self.pb.leave_team()
+        leave_packet = self.pb.leave_team(self.uid)
         await self.conn.send_whisper(leave_packet)
         await asyncio.sleep(self.leave_delay)
         logger.info("Left team")

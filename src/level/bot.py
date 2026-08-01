@@ -140,7 +140,11 @@ class LevelBot:
         # ── Step 3: GetLoginData ──
         # Use the dynamic URL from MajorLogin response for GetLoginData
         base_url = login_result.get("url", None)
-        server_info = await self.auth.get_login_data(jwt_token, base_url, access_token)
+        # Pass the MajorLogin encrypted payload for reuse (same as ClanGloryBot)
+        major_login_payload = login_result.get("payload", None)
+        server_info = await self.auth.get_login_data(
+            jwt_token, base_url, access_token, major_login_payload
+        )
         if not server_info:
             self.stats.state = "auth_failed"
             logger.error("GetLoginData failed")
@@ -150,8 +154,9 @@ class LevelBot:
         whisper_ip, whisper_port, online_ip, online_port = server_info
 
         # ── Step 4: Build connection token ──
+        account_uid = login_result.get("account_uid", int(self.uid))
         conn_token = await self.auth.build_connection_token(
-            jwt_token, key, iv, timestamp, int(self.uid)
+            jwt_token, key, iv, timestamp, account_uid
         )
         if not conn_token:
             self.stats.state = "auth_failed"
@@ -166,6 +171,9 @@ class LevelBot:
         self.stats.state = "connecting"
         self.connection = GameConnection()
         self.pb = PacketBuilder(key, iv)
+
+        # Set crypto keys on connection (for keepalive + global auth)
+        self.connection.set_crypto(key, iv)
 
         try:
             await self.connection.connect(
@@ -192,6 +200,7 @@ class LevelBot:
             join_delay=self.join_delay,
             leave_delay=self.leave_delay,
             cycle_delay=self.cycle_delay,
+            uid=account_uid,
         )
 
         def on_progress(stats: MatchStats):

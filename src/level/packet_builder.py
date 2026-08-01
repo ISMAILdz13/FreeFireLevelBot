@@ -140,22 +140,22 @@ class PacketBuilder:
         }
         return self.build_packet("0515", fields)
 
-    def start_match(self) -> bytes:
+    def start_match(self, uid: int = 0) -> bytes:
         """Build start-match (ready) packet — field 1=9 triggers match start."""
         fields = {
             1: 9,
             2: {
-                1: 12480598706,
+                1: uid if uid else 12480598706,
             },
         }
         return self.build_packet("0515", fields)
 
-    def leave_team(self) -> bytes:
+    def leave_team(self, uid: int = 0) -> bytes:
         """Build leave-squad packet — field 1=7 triggers leave."""
         fields = {
             1: 7,
             2: {
-                1: 12480598706,
+                1: uid if uid else 12480598706,
             },
         }
         return self.build_packet("0515", fields)
