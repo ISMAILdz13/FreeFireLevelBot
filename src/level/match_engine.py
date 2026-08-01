@@ -144,22 +144,44 @@ class MatchEngine:
         # ── Step 1: Join team ──
         self.stats.current_state = "joining"
         self.stats.join_attempts += 1
-        join_packet = self.pb.join_team(team_code)
+        join_packet = self.pb.join_team(team_code, self.uid)
         await self.conn.send_whisper(join_packet)
+        # Also send on online channel (server may expect it there)
+        await self.conn.send_online(join_packet)
         await asyncio.sleep(self.join_delay)
         logger.info(f"Joined team {team_code}")
 
         if self._stop_requested:
             return
 
-        # ── Step 2: Start match (spam start packets) ──
+        # ── Step 2: Start match (send 269 + 214, then spam field 9 ready) ──
         self.stats.current_state = "matching"
-        start_packet = self.pb.start_match(self.uid)
+
+        # Send the actual match-start commands (field 269 + 214) — these trigger matchmaking
+        start_detailed = self.pb.start_match_detailed(self.uid)
+        start_simple = self.pb.start_match_simple()
+        ready_packet = self.pb.start_match_ready(self.uid)
+
+        # Send 269 (detailed start) on both channels
+        await self.conn.send_online(start_detailed)
+        await self.conn.send_whisper(start_detailed)
+        logger.info(f"Sent field 269 (detailed start) on both channels")
+
+        await asyncio.sleep(0.5)
+
+        # Send 214 (simple start) on both channels
+        await self.conn.send_online(start_simple)
+        await self.conn.send_whisper(start_simple)
+        logger.info(f"Sent field 214 (simple start) on both channels")
+
+        await asyncio.sleep(0.5)
+
+        # Now spam field 9 (ready signal) for the duration
         end_time = time.time() + self.spam_duration
-        packets_sent = 0
+        packets_sent = 2  # Already sent 269 + 214
 
         while time.time() < end_time and not self._stop_requested:
-            await self.conn.send_online(start_packet)
+            await self.conn.send_online(ready_packet)
             packets_sent += 1
             await asyncio.sleep(self.spam_delay)
 

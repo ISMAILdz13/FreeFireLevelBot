@@ -170,7 +170,8 @@ class LevelBot:
         # ── Step 5: Connect to game servers ──
         self.stats.state = "connecting"
         self.connection = GameConnection()
-        self.pb = PacketBuilder(key, iv)
+        region = login_result.get("region", "ME")
+        self.pb = PacketBuilder(key, iv, region=region)
 
         # Set crypto keys on connection (for keepalive + global auth)
         self.connection.set_crypto(key, iv)
