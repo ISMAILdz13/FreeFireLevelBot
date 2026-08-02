@@ -141,8 +141,20 @@ class LevelAuth:
             {"error": "major_login_failed", "last_status": <http_status>}
         """
         data = bytes.fromhex(TEMPLATE_HEX)
+
+        # Substitute date (template has 2025-07-30 — over a year old, server rejects stale dates)
+        new_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data = data.replace(OLD_DATE.encode(), new_date.encode())
+
+        # Substitute access_token and open_id
         data = data.replace(OLD_OPEN_ID.encode(), open_id.encode())
         data = data.replace(OLD_ACCESS_TOKEN.encode(), access_token.encode())
+
+        # Substitute signature MD5 (must match the new date)
+        import hashlib
+        sig_input = f"free_fire{new_date}WmfdlkTOtsflIWMx4bpg5m4bpg5V31m0bpgm4bpg5mO24bpgN31m0bpgZ31m0m4G"
+        sig_md5 = hashlib.md5(sig_input.encode()).hexdigest()
+        data = data.replace(OLD_SIGNATURE_MD5.encode(), sig_md5.encode())
 
         encrypted = _encrypt_api(data.hex())
         payload = bytes.fromhex(encrypted)
