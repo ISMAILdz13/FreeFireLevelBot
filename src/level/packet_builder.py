@@ -260,6 +260,58 @@ class PacketBuilder:
         }
         return self.build_packet(fields, "0e15")
 
+
+    # ── OB54-TCP-BOT level bot packets (1:1 match) ──
+
+    def join_teamcode(self, team_code: str) -> bytes:
+        """Join team using code — 1:1 with OB54-TCP-BOT join_teamcode_packet.
+        Field 1=4, field 2.5=str(code), same structure as GenJoinSquadsPacket."""
+        fields = {
+            1: 4,
+            2: {
+                4: b"\x01\x09\x0a\x0b\x12\x19\x20",
+                5: str(team_code),
+                6: 6,
+                8: 1,
+                9: {
+                    2: 800,
+                    6: 11,
+                    8: "1.126.2",
+                    9: 5,
+                    10: 1,
+                },
+            },
+        }
+        return self.build_packet(fields)
+
+    def start_auto_match(self, uid: int) -> bytes:
+        """Start match packet — 1:1 with OB54-TCP-BOT start_auto_packet / FS.
+        Field 1=9, field 2={1: UID}. Just spam this — no 269/214 needed."""
+        fields = {
+            1: 9,
+            2: {
+                1: uid,
+            },
+        }
+        return self.build_packet(fields)
+
+    def switch_lone_wolf(self, uid: int) -> bytes:
+        """Switch to Lone Wolf 1v1 mode — 1:1 with OB54-TCP-BOT SwitchLoneWolfDule.
+        Field 1=17, type 0519."""
+        fields = {
+            1: 17,
+            2: {
+                1: uid,
+                2: 1,
+                3: 1,
+                4: 43,
+                5: "\x0b",
+                8: 1,
+                19: 1,
+            },
+        }
+        return self.build_packet(fields, "0519")
+
     # ── Legacy compatibility (deprecated — use join_squad) ──
 
     def join_team(self, team_code: str, uid: int = 0) -> bytes:

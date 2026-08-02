@@ -39,7 +39,7 @@ def banner():
     clear()
     print(f"{C.CY}{C.B}")
     print("  ========================================")
-    print("  |    FREE FIRE LEVEL BOT - LONE WOLF   |")
+    print("  |        FREE FIRE LEVEL BOT           |")
     print(f"  |{C.R}  v2.0  {C.CY}{C.B}|{C.R}  Termux Edition  {C.CY}{C.B}|{C.R}")
     print("  ========================================")
     print(f"{C.R}")
@@ -131,7 +131,7 @@ async def run_bot(uid, password, team_code, spam_duration=18, spam_delay=0.2,
     print(f"  {C.CY}----------------------------------------{C.R}")
     print(f"  {C.B}Starting Level Bot...{C.R}")
     print(f"  {C.D}UID:  {C.W}{uid}{C.R}")
-    print(f"  {C.D}Mode: {C.W}Lone Wolf 1v1{C.R}")
+    print(f"  {C.D}Team: {C.W}{team_code}{C.R}")
     print(f"  {C.D}Spam: {C.W}{spam_duration}s{C.D} (delay {spam_delay}s){C.R}")
     print(f"  {C.D}Wait: {C.W}{wait_after}s{C.R}")
     print(f"  {C.D}Cycles: {C.W}{'infinite' if max_cycles >= 999999 else max_cycles}{C.R}")
@@ -173,11 +173,14 @@ def opt1_quick():
         input(f"\n  {C.D}Press Enter...{C.R}")
         return
 
-    print(f"  {C.D}Lone Wolf 1v1 mode — bot will solo matchmaking{C.R}")
-    print(f"  {C.D}Enter match → exit immediately → opponent wins → repeat{C.R}")
-    print()
+    team_code = input(f"  {C.CY}Team code: {C.W}").strip()
+    if not team_code or not team_code.isdigit():
+        print(f"  {C.R1}Invalid! Numbers only.{C.R}")
+        input(f"\n  {C.D}Press Enter...{C.R}")
+        return
+
     asyncio.run(run_bot(
-        uid=guest["uid"], password=guest["password"], team_code="",
+        uid=guest["uid"], password=guest["password"], team_code=team_code,
     ))
 
 
@@ -196,8 +199,12 @@ def opt2_custom():
         input(f"\n  {C.D}Press Enter...{C.R}")
         return
 
-    print(f"  {C.D}Lone Wolf 1v1 mode — solo matchmaking{C.R}")
-    print()
+    team_code = input(f"  {C.CY}Team code: {C.W}").strip()
+    if not team_code or not team_code.isdigit():
+        print(f"  {C.R1}Invalid! Numbers only.{C.R}")
+        input(f"\n  {C.D}Press Enter...{C.R}")
+        return
+
     def num(prompt, default, lo=1, hi=9999):
         raw = input(f"  {C.CY}{prompt} {C.D}[{default}]:{C.W} ").strip()
         if not raw:
@@ -225,7 +232,7 @@ def opt2_custom():
     max_cyc  = num("Max cycles (0=inf)", 0, 0, 99999)
 
     asyncio.run(run_bot(
-        uid=guest["uid"], password=guest["password"], team_code="",
+        uid=guest["uid"], password=guest["password"], team_code=team_code,
         spam_duration=spam_dur, spam_delay=spam_dly,
         wait_after=wait_af, max_cycles=max_cyc,
     ))
