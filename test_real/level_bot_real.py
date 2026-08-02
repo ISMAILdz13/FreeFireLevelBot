@@ -482,47 +482,29 @@ async def auto_start_loop(team_code, online_writer, key, iv,
                            spam_delay=START_SPAM_DELAY,
                            wait_after_match=WAIT_AFTER_MATCH,
                            max_cycles=1000):
-    """Auto start loop: join → spam start → wait → leave → repeat."""
+    """Auto start loop: open squad -> spam start -> wait -> leave -> repeat."""
 
     cycle_count = 0
 
-    print(f"\n🚀 Auto start loop — team: {team_code}")
-    print(f"⚡ Join → Start → Wait({wait_after_match}s) → Leave → Repeat\n")
+    print(f"\n🚀 Auto start loop — SOLO MODE")
+    print(f"⚡ Open → Start → Wait({wait_after_match}s) → Leave → Repeat\n")
 
-    # ── Init: Reset to solo + open squad ──
-    print("  → Resetting to solo mode...")
-    leave_pkt = await leave_squad_packet(key, iv)
-    online_writer.write(leave_pkt)
-    await online_writer.drain()
-    await asyncio.sleep(1)
-    print("  ✅ Left any existing squad")
-
+    # ── Init: Open own squad ──
     print("  → Opening own squad...")
     open_pkt = await open_squad_packet(key, iv)
     online_writer.write(open_pkt)
     await online_writer.drain()
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
     print("  ✅ Own squad opened")
+
+    leave_pkt = await leave_squad_packet(key, iv)
 
     while cycle_count < max_cycles:
         try:
             cycle_count += 1
             print(f"\n🔄 Cycle #{cycle_count}")
 
-            # ── Step 1: Leave current squad + join team ──
-            print(f"  → Leaving current squad...")
-            online_writer.write(leave_pkt)
-            await online_writer.drain()
-            await asyncio.sleep(0.5)
-
-            print(f"  → Joining team {team_code}...")
-            join_packet = await join_teamcode_packet(team_code, key, iv)
-            online_writer.write(join_packet)
-            await online_writer.drain()
-            await asyncio.sleep(JOIN_DELAY)
-            print(f"  ✅ Join sent for team {team_code}")
-
-            # ── Step 2: Spam start match (field 1=9) ──
+            # ── Step 1: Spam start match (field 1=9) ──
             print(f"  → Spamming start match ({spam_duration}s)...")
             start_packet = await start_auto_packet(key, iv)
             end_time = time.time() + spam_duration
@@ -536,21 +518,26 @@ async def auto_start_loop(team_code, online_writer, key, iv,
 
             print(f"  📮 Sent {spam_count} start packets")
 
-            # ── Step 3: Wait for match to complete ──
+            # ── Step 2: Wait for match to complete ──
             print(f"  ⏳ Waiting {wait_after_match}s for match...")
             waited = 0
             while waited < wait_after_match:
                 await asyncio.sleep(1)
                 waited += 1
 
-            # ── Step 4: Leave squad ──
-            print(f"  🚪 Leaving team...")
+            # ── Step 3: Leave + reopen squad ──
+            print(f"  🚪 Leaving squad...")
             online_writer.write(leave_pkt)
             await online_writer.drain()
-            await asyncio.sleep(LEAVE_DELAY)
-            print(f"  ✅ Left team — cycle {cycle_count} done")
+            await asyncio.sleep(1)
 
-            # ── Step 5: Cycle delay ──
+            print(f"  → Reopening squad...")
+            online_writer.write(open_pkt)
+            await online_writer.drain()
+            await asyncio.sleep(1)
+            print(f"  ✅ Cycle {cycle_count} done")
+
+            # ── Step 4: Cycle delay ──
             await asyncio.sleep(CYCLE_DELAY)
 
         except Exception as e:
