@@ -653,33 +653,42 @@ async def main():
     print(f"  Wait:      {WAIT_AFTER_MATCH}s")
     print("=" * 55)
 
-    # ── Step 1: Get open_id + access_token ──
+    # ── Step 1+2: Get tokens and do MajorLogin (with fallbacks) ──
     open_id = None
     access_token = None
+    login_response = None
 
+    # Attempt 1: stored tokens from guests.json
     if use_stored_tokens:
-        print(f"\n📡 Step 1: Using stored tokens from guests.json...")
+        print(f"\n📡 Step 1: Trying stored tokens from guests.json...")
         open_id = cred["open_id"]
         access_token = cred["access_token"]
-        print(f"  ✅ open_id: {open_id}")
-        print(f"  ✅ token:   {access_token[:20]}...")
-    else:
-        print(f"\n📡 Step 1: Getting access token via OAuth...")
-        open_id, access_token = await GeNeRaTeAccEss(uid, password)
-        if open_id:
-            print(f"  ✅ open_id: {open_id}")
-            print(f"  ✅ token:   {access_token[:20]}...")
+        print(f"  open_id: {open_id[:16]}...")
+        print(f"  token:   {access_token[:16]}...")
+        print("\n📡 Step 2: MajorLogin with stored tokens...")
+        payload = await EncRypTMajoRLoGin(open_id, access_token)
+        login_response = await MajorLogin(payload)
+        if login_response:
+            print(f"  ✅ MajorLogin success: {len(login_response)} bytes")
 
-    if not open_id and cred.get("password"):
-        # Try OAuth with stored password
+    # Attempt 2: OAuth V2/V1 with stored password (if available)
+    if not login_response and cred.get("password"):
         print(f"\n📡 Step 1b: Trying OAuth with stored password...")
         open_id, access_token = await GeNeRaTeAccEss(uid, cred["password"])
         if open_id:
-            print(f"  ✅ open_id: {open_id}")
-            print(f"  ✅ token:   {access_token[:20]}...")
+            print(f"  ✅ OAuth success! open_id={open_id[:16]}...")
+            print("\n📡 Step 2b: MajorLogin with OAuth tokens...")
+            payload = await EncRypTMajoRLoGin(open_id, access_token)
+            login_response = await MajorLogin(payload)
+            if login_response:
+                print(f"  ✅ MajorLogin success: {len(login_response)} bytes")
 
-    if not open_id:
-        # Last resort: register a new guest
+    # Attempt 3: OAuth with password from accounts file (if --accounts was used)
+    if not login_response and password and not use_stored_tokens:
+        print(f"\n📡 Already tried OAuth above, skipping...")
+
+    # Attempt 4: Register a brand new guest
+    if not login_response:
         print(f"\n📡 Step 1c: All tokens expired. Registering fresh guest...")
         new_uid, new_pwd, new_oid, new_tok = await register_new_guest()
         if new_oid:
@@ -687,24 +696,19 @@ async def main():
             open_id = new_oid
             access_token = new_tok
             print(f"  ✅ New guest: UID={uid}")
-            print(f"  ✅ open_id: {open_id}")
-            print(f"  ✅ token:   {access_token[:20]}...")
+            print("\n📡 Step 2c: MajorLogin with fresh tokens...")
+            payload = await EncRypTMajoRLoGin(open_id, access_token)
+            login_response = await MajorLogin(payload)
+            if login_response:
+                print(f"  ✅ MajorLogin success: {len(login_response)} bytes")
         else:
-            print("❌ Could not get tokens — try running gen_guest.py first")
+            print("❌ Could not register a new guest")
+            print("  Try manually: python3 gen_guest.py")
             return
 
-    # ── Step 2: MajorLogin ──
-    print("\n📡 Step 2: MajorLogin...")
-    payload = await EncRypTMajoRLoGin(open_id, access_token)
-    login_response = await MajorLogin(payload)
     if not login_response:
-        print("❌ MajorLogin failed — all endpoints returned rejection")
-        print("  Tokens may be expired. Try:")
-        print("  1. python3 gen_guest.py  (generate fresh guest)")
-        print("  2. python3 level_bot_real.py --accounts ../data/level_accounts.json <uid> <team_code>")
+        print("\n❌ All attempts failed. The account may be banned.")
         return
-
-    print(f"  ✅ Got login response: {len(login_response)} bytes")
 
     # ── Step 3: Decrypt login response ──
     print("\n📡 Step 3: Decrypting login response...")
