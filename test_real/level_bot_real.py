@@ -427,22 +427,22 @@ async def join_teamcode_packet(team_code, key, iv):
     }
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
-async def start_auto_packet(uid, key, iv):
-    """Start match packet — field 1=9, field 2={1: UID}."""
+async def start_auto_packet(key, iv):
+    """Start match packet — field 1=9, field 2={1: 12480598706}."""
     fields = {
         1: 9,
         2: {
-            1: uid,
+            1: 12480598706,
         },
     }
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
-async def leave_squad_packet(uid, key, iv):
-    """Leave squad — field 1=7, field 2={1: UID}."""
+async def leave_squad_packet(key, iv):
+    """Leave squad — field 1=7, field 2={1: 12480598706}."""
     fields = {
         1: 7,
         2: {
-            1: uid,
+            1: 12480598706,
         },
     }
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
@@ -452,7 +452,7 @@ async def leave_squad_packet(uid, key, iv):
 #  auto_start_loop — THE REAL LEVEL BOT LOOP (1:1 copy)
 # ═══════════════════════════════════════════════════════════════
 
-async def auto_start_loop(team_code, online_writer, key, iv, bot_uid,
+async def auto_start_loop(team_code, online_writer, key, iv,
                            spam_duration=START_SPAM_DURATION,
                            spam_delay=START_SPAM_DELAY,
                            wait_after_match=WAIT_AFTER_MATCH,
@@ -479,7 +479,7 @@ async def auto_start_loop(team_code, online_writer, key, iv, bot_uid,
 
             # ── Step 2: Spam start match (field 1=9) ──
             print(f"  → Spamming start match ({spam_duration}s)...")
-            start_packet = await start_auto_packet(bot_uid, key, iv)
+            start_packet = await start_auto_packet(key, iv)
             end_time = time.time() + spam_duration
             spam_count = 0
 
@@ -500,7 +500,7 @@ async def auto_start_loop(team_code, online_writer, key, iv, bot_uid,
 
             # ── Step 4: Leave squad ──
             print(f"  🚪 Leaving team...")
-            leave_packet = await leave_squad_packet(bot_uid, key, iv)
+            leave_packet = await leave_squad_packet(key, iv)
             online_writer.write(leave_packet)
             await online_writer.drain()
             await asyncio.sleep(LEAVE_DELAY)
@@ -523,7 +523,8 @@ async def auto_start_loop(team_code, online_writer, key, iv, bot_uid,
 # ═══════════════════════════════════════════════════════════════
 
 async def read_online(reader, key, iv):
-    """Read packets from online server — for debugging."""
+    """Read packets from online server — parse as protobuf."""
+    from protobuf_decoder.protobuf_decoder import Parser
     while True:
         try:
             data = await reader.read(9999)
@@ -533,17 +534,18 @@ async def read_online(reader, key, iv):
             data_hex = data.hex()
             pkt_type = data_hex[:4] if len(data_hex) >= 4 else "?"
             pkt_len = len(data)
-            if len(data_hex) > 8:
+
+            # Server responses: 5-byte header (10 hex chars) + raw protobuf
+            if len(data_hex) > 10:
                 try:
-                    # Try to decrypt the payload
-                    encrypted_hex = data_hex[8:]
-                    decrypted = await DEc_PacKeT(encrypted_hex, key, iv)
-                    # Parse first few fields
-                    print(f"  📥 RX [{pkt_type}] {pkt_len}B → {decrypted[:100]}...")
+                    proto_hex = data_hex[10:]
+                    parsed = Parser().parse(proto_hex)
+                    fields_str = ", ".join(f"f{r.field}={r.data}" for r in parsed[:5])
+                    print(f"  📥 RX [{pkt_type}] {pkt_len}B → {fields_str}")
                 except:
-                    print(f"  📥 RX [{pkt_type}] {pkt_len}B (encrypted, type={pkt_type})")
+                    print(f"  📥 RX [{pkt_type}] {pkt_len}B (raw: {data_hex[10:30]}...)")
             else:
-                print(f"  📥 RX [{pkt_type}] {pkt_len}B")
+                print(f"  📥 RX [{pkt_type}] {pkt_len}B (raw: {data_hex})")
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -776,7 +778,7 @@ async def main():
     print("\n🚀 Starting level bot + packet reader...\n")
 
     reader_task = asyncio.create_task(read_online(reader, key, iv))
-    loop_task = asyncio.create_task(auto_start_loop(team_code, writer, key, iv, int(account_uid)))
+    loop_task = asyncio.create_task(auto_start_loop(team_code, writer, key, iv))
 
     try:
         await loop_task
