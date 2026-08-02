@@ -52,11 +52,12 @@ DEFAULT_IV  = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 10
 HEADERS = {
     'X-Unity-Version': '2018.4.11f1',
     'ReleaseVersion': 'OB54',
-    'Content-Type': 'application/x-www-form-urlencoded',
+    'Content-Type': 'application/octet-stream',
     'X-GA': 'v1 1',
-    'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 9; G011A Build/PI)',
+    'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 11; SM-A145F Build/RP1A.200720.012)',
     'Connection': 'Keep-Alive',
     'Accept-Encoding': 'gzip',
+    'Expect': '100-continue',
 }
 
 # ── Timing (from OB54-TCP-BOT globals) ──
@@ -404,11 +405,11 @@ async def xAuThSTarTuP(TarGeT, token, timestamp, key, iv):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Level bot packets (1:1 copy from OB54-TCP-BOT)
+#  Level bot packets (ClanGloryBot 1:1)
 # ═══════════════════════════════════════════════════════════════
 
 async def join_teamcode_packet(team_code, key, iv):
-    """Join team using code — 1:1 with OB54-TCP-BOT join_teamcode_packet."""
+    """Join team using code — GenJoinSquadsPacket from xC4.py."""
     fields = {
         1: 4,
         2: {
@@ -428,8 +429,7 @@ async def join_teamcode_packet(team_code, key, iv):
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
 async def open_squad_packet(key, iv):
-    """Open/create own squad — OpEnSq from OB54-TCP-BOT.
-    Field 1=1 means 'open squad' (create new squad)."""
+    """Open/create own squad — OpEnSq from xC4.py."""
     fields = {
         1: 1,
         2: {
@@ -488,35 +488,43 @@ async def start_match_leader_packet(account_uid, key, iv):
 
 
 async def spam_ready_packet(account_uid, key, iv):
-    """Build the spam packet: field 1=9, field 2={1: account_uid}.
-    Uses ACCOUNT UID, not hardcoded value."""
+    """Build the spam packet: field 1=9, field 2={1: account_uid}."""
     fields = {1: 9, 2: {1: int(account_uid)}}
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
 
-
 async def leave_squad_packet(account_uid, key, iv):
-    """Leave squad — field 1=7, field 2={1: 12480598706}."""
-    fields = {
-        1: 7,
-        2: {
-            1: int(account_uid),
-        },
-    }
+    """Leave squad — field 1=7, field 2={1: account_uid}."""
+    fields = {1: 7, 2: {1: int(account_uid)}}
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
 
+async def auth_global_packet(key, iv):
+    """AutH_GlobAl — required after TCP connect. Sent on CHAT channel.
+    Field 1=3, field 2={2: 5, 3: 'en'}, packet type 1215."""
+    fields = {1: 3, 2: {2: 5, 3: "en"}}
+    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '1215', key, iv)
+
+
+async def keepalive_packet(key, iv, channel="online"):
+    """Keepalive — field 1=99, field 2={1: timestamp, 2: 1}.
+    Online channel uses 0515, Chat channel uses 1215."""
+    fields = {1: 99, 2: {1: int(time.time()), 2: 1}}
+    pkt_type = "1215" if channel == "chat" else "0515"
+    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), pkt_type, key, iv)
+
+
 # ═══════════════════════════════════════════════════════════════
-#  auto_start_loop — THE REAL LEVEL BOT LOOP (1:1 copy)
+#  auto_start_loop — SOLO MODE (ClanGloryBot solo_cycle 1:1)
 # ═══════════════════════════════════════════════════════════════
 
-async def auto_start_loop(team_code, online_writer, key, iv,
+async def auto_start_loop(team_code, online_writer, chat_writer, key, iv,
                            account_uid=None,
                            spam_duration=START_SPAM_DURATION,
                            spam_delay=START_SPAM_DELAY,
                            wait_after_match=WAIT_AFTER_MATCH,
                            max_cycles=1000):
-    """Solo farming: send start_match_leader (3 packets) + spam ready."""
+    """Solo farming: start_match_leader (3 pkts) + spam ready + keepalive."""
 
     cycle_count = 0
 
@@ -528,12 +536,33 @@ async def auto_start_loop(team_code, online_writer, key, iv,
     spam_pkt = await spam_ready_packet(account_uid, key, iv)
     leave_pkt = await leave_squad_packet(account_uid, key, iv)
 
+    # Keepalive
+    ka_stop = False
+
+    async def keepalive_loop():
+        """Background keepalive every 15s on both channels."""
+        while not ka_stop:
+            try:
+                ka_online = await keepalive_packet(key, iv, "online")
+                ka_chat = await keepalive_packet(key, iv, "chat")
+                if online_writer and not online_writer.is_closing():
+                    online_writer.write(ka_online)
+                    await online_writer.drain()
+                if chat_writer and not chat_writer.is_closing():
+                    chat_writer.write(ka_chat)
+                    await chat_writer.drain()
+            except Exception:
+                pass
+            await asyncio.sleep(15)
+
+    ka_task = asyncio.create_task(keepalive_loop())
+
     while cycle_count < max_cycles:
         try:
             cycle_count += 1
             print(f"\n🔄 Cycle #{cycle_count}")
 
-            # ── Step 1: Send 3 start-match packets ──
+            # Step 1: Send 3 start-match packets
             print(f"  → Sending start_match_leader (269, 214, 9)...")
             for pkt in leader_pkts:
                 online_writer.write(pkt)
@@ -541,30 +570,33 @@ async def auto_start_loop(team_code, online_writer, key, iv,
                 await asyncio.sleep(0.5)
             print(f"  ✅ Leader packets sent")
 
-            # ── Step 2: Spam ready signal (field 1=9) ──
+            # Step 2: Spam ready signal
             print(f"  → Spamming ready signal ({spam_duration}s)...")
             end_time = time.time() + spam_duration
             spam_count = 0
-
             while time.time() < end_time:
-                online_writer.write(spam_pkt)
-                await online_writer.drain()
-                spam_count += 1
-                await asyncio.sleep(spam_delay)
-
+                try:
+                    online_writer.write(spam_pkt)
+                    await online_writer.drain()
+                    spam_count += 1
+                    await asyncio.sleep(spam_delay)
+                except Exception as e:
+                    print(f"  ⚠️ Send error: {e}")
+                    break
             print(f"  📮 Sent {spam_count} ready packets")
 
-            # ── Step 3: Wait for match ──
+            # Step 3: Wait for match
             print(f"  ⏳ Waiting {wait_after_match}s for match...")
-            waited = 0
-            while waited < wait_after_match:
+            for _ in range(wait_after_match):
                 await asyncio.sleep(1)
-                waited += 1
 
-            # ── Step 4: Leave squad (reset for next cycle) ──
+            # Step 4: Leave squad
             print(f"  🚪 Leaving squad...")
-            online_writer.write(leave_pkt)
-            await online_writer.drain()
+            try:
+                online_writer.write(leave_pkt)
+                await online_writer.drain()
+            except Exception:
+                pass
             await asyncio.sleep(1)
             print(f"  ✅ Cycle {cycle_count} done")
 
@@ -576,45 +608,36 @@ async def auto_start_loop(team_code, online_writer, key, iv,
             traceback.print_exc()
             await asyncio.sleep(3)
 
+    ka_stop = True
+    ka_task.cancel()
     print(f"\n🛑 Auto start loop stopped after {cycle_count} cycles")
 
+
+# ═══════════════════════════════════════════════════════════════
+#  Packet reader (background)
+# ═══════════════════════════════════════════════════════════════
+
 async def read_online(reader, key, iv):
-    """Read packets from online server — parse as protobuf."""
-    from protobuf_decoder.protobuf_decoder import Parser
+    """Background reader — logs incoming packets."""
     while True:
         try:
-            data = await reader.read(9999)
+            data = await asyncio.wait_for(reader.read(65535), timeout=30.0)
             if not data:
-                print("  ⚠️ Server closed connection")
                 break
-            data_hex = data.hex()
-            pkt_type = data_hex[:4] if len(data_hex) >= 4 else "?"
-            pkt_len = len(data)
-
-            # Server responses: 5-byte header (10 hex chars) + raw protobuf
-            if len(data_hex) > 10:
-                try:
-                    proto_hex = data_hex[10:]
-                    parsed = Parser().parse(proto_hex)
-                    fields_str = ", ".join(f"f{r.field}={r.data}" for r in parsed[:5])
-                    print(f"  📥 RX [{pkt_type}] {pkt_len}B → {fields_str}")
-                except:
-                    print(f"  📥 RX [{pkt_type}] {pkt_len}B (raw: {data_hex[10:30]}...)")
-            else:
-                print(f"  📥 RX [{pkt_type}] {pkt_len}B (raw: {data_hex})")
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            print(f"  ⚠️ Read error: {e}")
+            hex_data = data.hex()
+            if len(hex_data) > 20:
+                print(f"  📥 RX: {len(data)}B header={hex_data[:12]}")
+        except asyncio.TimeoutError:
+            continue
+        except Exception:
             break
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Credential loading
+#  Load accounts
 # ═══════════════════════════════════════════════════════════════
 
 def load_from_guests(path, index):
-    """Load guest from guests.json — uses stored open_id + access_token."""
     with open(path) as f:
         guests = json.load(f)
     idx = int(index) - 1
@@ -632,13 +655,11 @@ def load_from_guests(path, index):
     }
 
 def load_from_accounts(path, uid):
-    """Load from level_accounts.json — hex password for OAuth."""
     with open(path) as f:
         accounts = json.load(f)
     uid_str = str(uid)
     if uid_str not in accounts:
         print(f"❌ UID {uid_str} not found in {path}")
-        print(f"   Available: {list(accounts.keys())}")
         sys.exit(1)
     return {
         "uid": uid_str,
@@ -649,201 +670,184 @@ def load_from_accounts(path, uid):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  MAIN — Full login + connect + level loop
+#  MAIN — Full login + dual TCP connect + level loop
 # ═══════════════════════════════════════════════════════════════
 
 async def main():
     args = sys.argv[1:]
 
-    # Parse args
     if len(args) >= 1 and args[0] == '--guests':
-        # --guests <path> <index> <team_code>
         if len(args) < 4:
             print("Usage: python3 level_bot_real.py --guests <path> <index> <team_code>")
-            print("Example: python3 level_bot_real.py --guests ../data/guests.json 1 2781283")
             sys.exit(1)
-        guests_path = args[1]
-        guest_index = args[2]
+        cred = load_from_guests(args[1], args[2])
         team_code = args[3]
-        cred = load_from_guests(guests_path, guest_index)
         use_stored_tokens = bool(cred["open_id"] and cred["access_token"])
 
     elif len(args) >= 1 and args[0] == '--accounts':
-        # --accounts <path> <uid> <team_code>
         if len(args) < 4:
             print("Usage: python3 level_bot_real.py --accounts <path> <uid> <team_code>")
-            print("Example: python3 level_bot_real.py --accounts ../data/level_accounts.json 5822030305 2781283")
             sys.exit(1)
-        accounts_path = args[1]
-        uid = args[2]
+        cred = load_from_accounts(args[1], args[2])
         team_code = args[3]
-        cred = load_from_accounts(accounts_path, uid)
         use_stored_tokens = False
 
     else:
-        # Direct: <uid> <password> <team_code>
         if len(args) < 3:
             print("Usage:")
             print("  python3 level_bot_real.py --guests <path> <index> <team_code>")
             print("  python3 level_bot_real.py --accounts <path> <uid> <team_code>")
             print("  python3 level_bot_real.py <uid> <password> <team_code>")
             sys.exit(1)
-        cred = {
-            "uid": args[0],
-            "password": args[1],
-            "open_id": None,
-            "access_token": None,
-        }
+        cred = {"uid": args[0], "password": args[1], "open_id": None, "access_token": None}
         team_code = args[2]
         use_stored_tokens = False
 
     uid = cred["uid"]
-    password = cred.get("password", "")
     region = cred.get("region", "ME")
 
     print("=" * 55)
-    print("  REAL LEVEL BOT — OB54-TCP-BOT 1:1")
+    print("  REAL LEVEL BOT — ClanGloryBot 1:1")
     print("=" * 55)
     print(f"  UID:       {uid}")
     print(f"  Team:      {team_code}")
-    print(f"  Auth:      {'stored tokens (skip OAuth)' if use_stored_tokens else 'OAuth (uid+password)'}")
+    print(f"  Auth:      {'stored tokens' if use_stored_tokens else 'OAuth'}")
     print(f"  Spam:      {START_SPAM_DURATION}s (delay {START_SPAM_DELAY}s)")
     print(f"  Wait:      {WAIT_AFTER_MATCH}s")
     print("=" * 55)
 
-    # ── Step 1+2: Get tokens and do MajorLogin (with fallbacks) ──
+    # ── Login ──
     open_id = None
     access_token = None
     login_response = None
+    payload = None
 
-    # Attempt 1: stored tokens from guests.json
     if use_stored_tokens:
-        print(f"\n📡 Step 1: Trying stored tokens from guests.json...")
+        print(f"\n📡 Step 1: Stored tokens...")
         open_id = cred["open_id"]
         access_token = cred["access_token"]
-        print(f"  open_id: {open_id[:16]}...")
-        print(f"  token:   {access_token[:16]}...")
-        print("\n📡 Step 2: MajorLogin with stored tokens...")
         payload = await EncRypTMajoRLoGin(open_id, access_token)
         login_response = await MajorLogin(payload)
         if login_response:
-            print(f"  ✅ MajorLogin success: {len(login_response)} bytes")
+            print(f"  ✅ MajorLogin: {len(login_response)} bytes")
 
-    # Attempt 2: OAuth V2/V1 with stored password (if available)
     if not login_response and cred.get("password"):
-        print(f"\n📡 Step 1b: Trying OAuth with stored password...")
+        print(f"\n📡 Step 1b: OAuth...")
         open_id, access_token = await GeNeRaTeAccEss(uid, cred["password"])
         if open_id:
-            print(f"  ✅ OAuth success! open_id={open_id[:16]}...")
-            print("\n📡 Step 2b: MajorLogin with OAuth tokens...")
+            print(f"  ✅ OAuth OK")
             payload = await EncRypTMajoRLoGin(open_id, access_token)
             login_response = await MajorLogin(payload)
             if login_response:
-                print(f"  ✅ MajorLogin success: {len(login_response)} bytes")
+                print(f"  ✅ MajorLogin: {len(login_response)} bytes")
 
-    # Attempt 3: OAuth with password from accounts file (if --accounts was used)
-    if not login_response and password and not use_stored_tokens:
-        print(f"\n📡 Already tried OAuth above, skipping...")
-
-    # Attempt 4: Register a brand new guest
     if not login_response:
-        print(f"\n📡 Step 1c: All tokens expired. Registering fresh guest...")
+        print(f"\n📡 Step 1c: Registering fresh guest...")
         new_uid, new_pwd, new_oid, new_tok = await register_new_guest()
         if new_oid:
             uid = new_uid
             open_id = new_oid
             access_token = new_tok
-            print(f"  ✅ New guest: UID={uid}")
-            print("\n📡 Step 2c: MajorLogin with fresh tokens...")
             payload = await EncRypTMajoRLoGin(open_id, access_token)
             login_response = await MajorLogin(payload)
-            if login_response:
-                print(f"  ✅ MajorLogin success: {len(login_response)} bytes")
         else:
-            print("❌ Could not register a new guest")
-            print("  Try manually: python3 gen_guest.py")
+            print("❌ Could not register new guest")
             return
 
     if not login_response:
-        print("\n❌ All attempts failed. The account may be banned.")
+        print("\n❌ All login attempts failed. Account may be banned.")
         return
 
-    # ── Step 3: Decrypt login response ──
-    print("\n📡 Step 3: Decrypting login response...")
+    # ── Decrypt ──
+    print("\n📡 Step 2: Decrypting...")
     auth = await DecRypTMajoRLoGin(login_response)
-
     account_uid = auth.account_uid
     token = auth.token
     url = auth.url
     key = auth.key
     iv = auth.iv
     timestamp = auth.timestamp
+    print(f"  ✅ uid={account_uid}, key={key.hex()[:16]}...")
 
-    print(f"  ✅ account_uid: {account_uid}")
-    print(f"  ✅ token:      {token[:30]}...")
-    print(f"  ✅ url:         {url}")
-    print(f"  ✅ key:         {key.hex()}")
-    print(f"  ✅ iv:          {iv.hex()}")
-    print(f"  ✅ timestamp:   {timestamp}")
-
-    # ── Step 4: GetLoginData (server IPs) ──
-    print("\n📡 Step 4: Getting server IPs...")
+    # ── GetLoginData ──
+    print("\n📡 Step 3: GetLoginData...")
     login_data = await GetLoginData(url, payload, token)
     if not login_data:
         print("❌ GetLoginData failed")
         return
-
     login_data_dec = await DecRypTLoGinDaTa(login_data)
-    online_ports = login_data_dec.Online_IP_Port
-    chat_ports = login_data_dec.AccountIP_Port
-    acc_name = login_data_dec.AccountName
+    online_ip, online_port = login_data_dec.Online_IP_Port.split(":")
+    chat_ip, chat_port = login_data_dec.AccountIP_Port.split(":")
+    print(f"  ✅ Online: {online_ip}:{online_port}")
+    print(f"  ✅ Chat:   {chat_ip}:{chat_port}")
 
-    online_ip, online_port = online_ports.split(":")
-    chat_ip, chat_port = chat_ports.split(":")
-
-    print(f"  ✅ Online server: {online_ip}:{online_port}")
-    print(f"  ✅ Chat server:   {chat_ip}:{chat_port}")
-    print(f"  ✅ Account name:  {acc_name}")
-
-    # ── Step 5: Build auth token for TCP ──
-    print("\n📡 Step 5: Building TCP auth token...")
+    # ── TCP auth token ──
+    print("\n📡 Step 4: Building auth token...")
     auth_token = await xAuThSTarTuP(int(account_uid), token, int(timestamp), key, iv)
-    print(f"  ✅ Auth token: {len(auth_token)} chars")
-
-    # ── Step 6: TCP connect to Online server ──
-    print(f"\n📡 Step 6: Connecting to {online_ip}:{online_port}...")
-    try:
-        reader, writer = await asyncio.open_connection(online_ip, int(online_port))
-    except Exception as e:
-        print(f"❌ TCP connection failed: {e}")
-        return
-
-    print(f"  ✅ Connected!")
-
-    # ── Step 7: Send auth token ──
-    print("\n📡 Step 7: Sending auth token...")
     auth_bytes = bytes.fromhex(auth_token)
-    writer.write(auth_bytes)
-    await writer.drain()
-    print(f"  ✅ Auth token sent ({len(auth_bytes)} bytes)")
+    print(f"  ✅ Token: {len(auth_bytes)} bytes")
 
-    # Wait for server to process auth
-    await asyncio.sleep(2)
+    # ── TCP connect to BOTH servers ──
+    import socket as _socket
 
-    # ── Step 8: Start level bot loop + reader ──
-    print("\n🚀 Starting level bot + packet reader...\n")
+    print(f"\n📡 Step 5: Connecting Online {online_ip}:{online_port}...")
+    try:
+        online_reader, online_writer = await asyncio.open_connection(online_ip, int(online_port))
+    except Exception as e:
+        print(f"❌ Online TCP failed: {e}")
+        return
+    print(f"  ✅ Online connected!")
 
-    reader_task = asyncio.create_task(read_online(reader, key, iv))
-    loop_task = asyncio.create_task(auto_start_loop(team_code, writer, key, iv, account_uid=account_uid))
+    print(f"📡 Step 5b: Connecting Chat {chat_ip}:{chat_port}...")
+    try:
+        chat_reader, chat_writer = await asyncio.open_connection(chat_ip, int(chat_port))
+    except Exception as e:
+        print(f"❌ Chat TCP failed: {e}")
+        return
+    print(f"  ✅ Chat connected!")
+
+    # OS-level TCP keepalive
+    for w in [online_writer, chat_writer]:
+        sock = w.get_extra_info('socket')
+        if sock:
+            sock.setsockopt(_socket.SOL_SOCKET, _socket.SO_KEEPALIVE, 1)
+
+    # ── Auth to BOTH servers ──
+    print("\n📡 Step 6: Sending auth tokens...")
+    online_writer.write(auth_bytes)
+    await online_writer.drain()
+    chat_writer.write(auth_bytes)
+    await chat_writer.drain()
+    print(f"  ✅ Auth sent to both ({len(auth_bytes)} bytes each)")
+    await asyncio.sleep(1)
+
+    # ── AutH_GlobAl on chat channel ──
+    print("📡 Step 6b: AutH_GlobAl on chat...")
+    global_pkt = await auth_global_packet(key, iv)
+    chat_writer.write(global_pkt)
+    await chat_writer.drain()
+    print(f"  ✅ AutH_GlobAl sent ({len(global_pkt)} bytes)")
+    await asyncio.sleep(0.5)
+
+    # ── Start loop + readers ──
+    print("\n🚀 Starting level bot...\n")
+    online_reader_task = asyncio.create_task(read_online(online_reader, key, iv))
+    chat_reader_task = asyncio.create_task(read_online(chat_reader, key, iv))
+    loop_task = asyncio.create_task(
+        auto_start_loop(team_code, online_writer, chat_writer, key, iv, account_uid=account_uid)
+    )
 
     try:
         await loop_task
     except KeyboardInterrupt:
         print("\n🛑 Stopping...")
     finally:
-        reader_task.cancel()
-        writer.close()
-        await writer.wait_closed()
+        online_reader_task.cancel()
+        chat_reader_task.cancel()
+        online_writer.close()
+        chat_writer.close()
+        await online_writer.wait_closed()
+        await chat_writer.wait_closed()
         print("✅ Disconnected")
 
 
