@@ -1,16 +1,8 @@
 """
-Level Bot Authentication — OB54 + xC4 connection token
-Merges the OB54 multi-endpoint approach with xC4-based TCP auth.
-
-Flow:
-  1. Guest OAuth (v2 JSON → v1 form-urlencoded fallback)
-  2. MajorLogin (ggwhitehawk → ggpolarbear → ggblueshark fallback)
-  3. GetLoginData (dynamic URL, PorTs_pb2 parsing)
-  4. Connection token (xC4 EnC_PacKeT + DecodE_HeX)
+Level Bot Authentication — uses protobuf MajorLogin (same as ClanGloryBot)
+Builds the MajorLogin payload dynamically, NOT from a stale template hex.
 """
 
-import json
-import base64
 import asyncio
 import logging
 import hashlib
@@ -23,74 +15,64 @@ from Crypto.Util.Padding import pad
 
 logger = logging.getLogger("levelbot.auth")
 
-# ── Endpoints (OB54) ─────────────────────────────────────
+# ── Endpoints (same as ClanGloryBot) ──────────────────────
 
-OAUTH_URLS = [
-    "https://ffmconnect.live.gop.garenanow.com/api/v2/oauth/guest/token:grant",
-    "https://100067.connect.garena.com/oauth/guest/token/grant",
-]
-
-MAJOR_LOGIN_URLS = [
-    "https://loginbp.ggwhitehawk.com/MajorLogin",
-    "https://loginbp.ggpolarbear.com/MajorLogin",
-    "https://loginbp.ggblueshark.com/MajorLogin",
-]
-
+OAUTH_V2_URL = "https://ffmconnect.live.gop.garenanow.com/api/v2/oauth/guest/token:grant"
+OAUTH_V1_URL = "https://100067.connect.garena.com/oauth/guest/token/grant"
+MAJOR_LOGIN_URL = "https://loginbp.ggpolarbear.com/MajorLogin"
 LOGIN_DATA_URL_FALLBACK = "https://clientbp.ggpolarbear.com/GetLoginData"
 
-GARENA_CLIENT_ID = "100067"
-GARENA_CLIENT_SECRET = "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3"
+OAUTH_CLIENT_SECRET = "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3"
 
-# ── Fixed AES key/IV for API payload encryption ──────────
+# ── AES key/IV (same as ClanGloryBot) ────────────────────
 
-API_KEY = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
-API_IV = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
+AES_KEY = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
+AES_IV = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
 
-# ── Template values ──────────────────────────────────────
+# ── Client version (same as ClanGloryBot) ────────────────
 
-OLD_ACCESS_TOKEN = "ff90c07eb9815af30a43b4a9f6019516e0e4c703b44092516d0defa4cef51f2a"
-OLD_OPEN_ID = "996a629dbcdb3964be6b6978f5d814db"
-OLD_DATE = "2025-07-30 11:02:51"
-OLD_SIGNATURE_MD5 = "7428b253defc164018c604a1ebbfebdf"
+CLIENT_VERSION = "1.126.2"
+CLIENT_VERSION_CODE = "2024010012"
 
-# ── User-Agent strings (OB54, Android 15) ────────────────
+# ── Headers (same as ClanGloryBot — Android 11, OB54) ────
 
-UA_OAUTH_V2 = "GarenaMSDK/4.0.19P10(I2404 ;Android 15;en;US;)"
-UA_OAUTH_V1 = "GarenaMSDK/4.0.19P9(A063 ;Android 13;en;IN;)"
-UA_DALVIK = "Dalvik/2.1.0 (Linux; U; Android 15; I2404 Build/AP3A.240905.015.A2_V000L1)"
-
-# ── Template hex ─────────────────────────────────────────
-
-TEMPLATE_HEX = (
-    "1a13323032352d30372d33302031313a30323a3531220966726565206669726528013a07312e3131382e31422c416e64726f6964204f5320372e312e32202f204150492d323320284e32473438482f373030323530323234294a0848616e6468656c645207416e64726f69645a045749464960c00c68840772033332307a1f41524d7637205646507633204e454f4e20564d48207c2032343635207c203480019a1b8a010f416472656e6f2028544d292036343092010d4f70656e474c20455320332e319a012b476f6f676c657c31663361643662372d636562342d343934622d383730622d623164616364373230393131a2010c3139372e312e31322e313335aa0102656eb201203939366136323964626364623339363462653662363937386635643831346462ba010134c2010848616e6468656c64ca011073616d73756e6720534d2d473935354eea014066663930633037656239383135616633306134336234613966363031393531366530653463373033623434303932353136643064656661346365663531663261f00101ca0207416e64726f6964d2020457494649ca03203734323862323533646566633136343031386336303461316562626665626466e003daa907e803899b07f003bf0ff803ae088004999b078804daa9079004999b079804daa907c80403d204262f646174612f6170702f636f6d2e6474732e667265656669726574682d312f6c69622f61726de00401ea044832303837663631633139663537663261663465376665666630623234643964397c2f646174612f6170702f636f6d2e6474732e667265656669726574682d312f626173652e61706bf00403f804018a050233329a050a32303139313138363933a80503b205094f70656e474c455332b805ff7fc00504e005dac901ea0507616e64726f6964f2055c4b71734854394748625876574c6668437950416c52526873626d43676542557562555551317375746d525536634e30524f3751453141486e496474385963784d614c575437636d4851322b7374745279377830663935542b6456593d8806019006019a060134a2060134b2061e40001147550d0c074f530b4d5c584d57416657545a065f2a091d6a0d5033"
-)
+HTTP_HEADERS = {
+    'User-Agent': "Dalvik/2.1.0 (Linux; U; Android 11; SM-A145F Build/RP1A.200720.012)",
+    'Connection': "Keep-Alive",
+    'Accept-Encoding': "gzip",
+    'Content-Type': "application/octet-stream",
+    'Expect': "100-continue",
+    'X-Unity-Version': "2018.4.11f1",
+    'X-GA': "v1 1",
+    'ReleaseVersion': "OB54",
+}
 
 
-def _encrypt_api(hex_data: str) -> str:
-    plain = bytes.fromhex(hex_data)
-    cipher = AES.new(API_KEY, AES.MODE_CBC, API_IV)
-    return cipher.encrypt(pad(plain, AES.block_size)).hex()
+def _build_major_login_payload(open_id: str, access_token: str) -> bytes:
+    """Build encrypted MajorLogin payload using protobuf message (same as ClanGloryBot)."""
+    from .Pb2.MajoRLoGinrEq_pb2 import MajorLogin
 
+    ml = MajorLogin()
+    ml.event_time = str(datetime.now())[:-7]  # "2026-08-02 17:09" — no seconds
+    ml.game_name = "free fire"
+    ml.platform_id = 2
+    ml.client_version = CLIENT_VERSION
+    ml.client_version_code = CLIENT_VERSION_CODE
+    ml.system_software = "Android OS 11 / API-30"
+    ml.system_hardware = "Handheld"
+    ml.device_type = "Handheld"
+    ml.open_id = open_id
+    ml.open_id_type = "4"
+    ml.access_token = access_token
+    ml.platform_sdk_id = 2
+    ml.login_by = 3
+    ml.login_open_id_type = 4
+    ml.origin_platform_type = "4"
+    ml.primary_platform_type = "4"
 
-def _build_payload(access_token: str, open_id: str) -> bytes:
-    """Build encrypted MajorLogin/GetLoginData payload with date+signature substitution."""
-    data = bytes.fromhex(TEMPLATE_HEX)
-
-    # Substitute date (template has 2025-07-30 — must update to current time)
-    new_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    data = data.replace(OLD_DATE.encode(), new_date.encode())
-
-    # Substitute access_token + open_id
-    data = data.replace(OLD_OPEN_ID.encode(), open_id.encode())
-    data = data.replace(OLD_ACCESS_TOKEN.encode(), access_token.encode())
-
-    # Substitute signature MD5 (must match the new date)
-    sig_input = f"free_fire{new_date}WmfdlkTOtsflIWMx4bpg5m4bpg5V31m0bpgm4bpg5mO24bpgN31m0bpgZ31m0m4G"
-    sig_md5 = hashlib.md5(sig_input.encode()).hexdigest()
-    data = data.replace(OLD_SIGNATURE_MD5.encode(), sig_md5.encode())
-
-    encrypted = _encrypt_api(data.hex())
-    return bytes.fromhex(encrypted)
+    raw = ml.SerializeToString()
+    enc = AES.new(AES_KEY, AES.MODE_CBC, AES_IV).encrypt(pad(raw, 16))
+    return enc
 
 
 class LevelAuth:
@@ -104,33 +86,30 @@ class LevelAuth:
         for attempt in range(retries):
             try:
                 resp = await self.http.post(
-                    OAUTH_URLS[0],
+                    OAUTH_V2_URL,
                     json={
-                        "client_id": int(GARENA_CLIENT_ID),
-                        "client_secret": GARENA_CLIENT_SECRET,
+                        "client_id": 100067,
+                        "client_secret": OAUTH_CLIENT_SECRET,
                         "client_type": 2,
                         "password": password,
                         "response_type": "token",
                         "uid": int(uid),
                     },
                     headers={
-                        "User-Agent": UA_OAUTH_V2,
-                        "Accept": "application/json",
                         "Content-Type": "application/json; charset=utf-8",
-                        "Connection": "Keep-Alive",
-                        "Accept-Encoding": "gzip",
+                        "User-Agent": "GarenaMSDK/4.0.19P10(I2404 ;Android 15;en;US;)",
                     },
                     timeout=15,
                 )
                 if resp.status_code == 200:
-                    resp_data = resp.json()
-                    data = resp_data.get("data", resp_data)
-                    access_token = data.get("access_token")
-                    open_id = data.get("open_id")
-                    if access_token and open_id:
+                    data = resp.json()
+                    odata = data.get("data", data)
+                    at = odata.get("access_token")
+                    oid = odata.get("open_id")
+                    if at and oid:
                         logger.info(f"Guest token acquired (v2) for UID {uid}")
-                        return access_token, open_id
-                    error = data.get("error", resp_data.get("error"))
+                        return at, oid
+                    error = odata.get("error", data.get("error"))
                     if error:
                         logger.warning(f"OAuth v2 error: {error}")
                         break
@@ -140,124 +119,106 @@ class LevelAuth:
             await asyncio.sleep(1)
 
         # Fall back to v1 (form-urlencoded)
-        logger.info("Falling back to OAuth v1 (100067.connect.garena.com)")
-        headers = {
-            "Host": "100067.connect.garena.com",
-            "User-Agent": UA_OAUTH_V1,
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "close",
-        }
-        data = {
-            "uid": uid,
-            "password": password,
-            "response_type": "token",
-            "client_type": "2",
-            "client_secret": GARENA_CLIENT_SECRET,
-            "client_id": GARENA_CLIENT_ID,
-        }
-
+        logger.info("Falling back to OAuth v1")
         for attempt in range(retries):
             try:
-                resp = await self.http.post(OAUTH_URLS[1], headers=headers, data=data, timeout=30)
-                resp_data = resp.json()
-                access_token = resp_data.get("access_token")
-                open_id = resp_data.get("open_id")
-                if access_token and open_id:
-                    logger.info(f"Guest token acquired (v1) for UID {uid}")
-                    return access_token, open_id
-                logger.warning(f"Guest token v1 response missing fields: {resp_data}")
+                resp = await self.http.post(
+                    OAUTH_V1_URL,
+                    data={
+                        "uid": uid,
+                        "password": password,
+                        "response_type": "token",
+                        "client_type": "2",
+                        "client_secret": OAUTH_CLIENT_SECRET,
+                        "client_id": "100067",
+                    },
+                    headers={
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "User-Agent": "GarenaMSDK/4.0.19P8(ASUS_Z01QD ;Android 12;en;US;)",
+                    },
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    at = data.get("access_token")
+                    oid = data.get("open_id")
+                    if at and oid:
+                        logger.info(f"Guest token acquired (v1) for UID {uid}")
+                        return at, oid
+                logger.warning(f"Guest token v1 attempt {attempt+1}: HTTP {resp.status_code}")
             except Exception as e:
                 logger.warning(f"Guest token v1 attempt {attempt+1}/{retries} failed: {e}")
                 await asyncio.sleep(2)
 
-        logger.error(f"Failed to get guest token for UID {uid} (both v1 and v2)")
+        logger.error(f"Failed to get guest token for UID {uid}")
         return None
 
-    # ── Step 2: MajorLogin (multi-endpoint fallback) ───────
+    # ── Step 2: MajorLogin (protobuf payload, single endpoint) ──
 
-    async def major_login(self, access_token: str, open_id: str, retries: int = 2) -> Optional[dict]:
-        payload = _build_payload(access_token, open_id)
+    async def major_login(self, access_token: str, open_id: str, retries: int = 3) -> Optional[dict]:
+        payload = _build_major_login_payload(open_id, access_token)
 
-        # OB54 headers
-        headers = {
-            "X-Unity-Version": "2018.4.11f1",
-            "ReleaseVersion": "OB54",
-            "Content-Type": "application/octet-stream",
-            "X-GA": "v1 1",
-            "Expect": "100-continue",
-            "User-Agent": UA_DALVIK,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-        }
+        headers = {**HTTP_HEADERS, "Authorization": f"Bearer {access_token}"}
 
         last_status = 0
-        last_body = b""
+        for attempt in range(retries):
+            try:
+                resp = await self.http.post(
+                    MAJOR_LOGIN_URL, headers=headers, content=payload, timeout=20
+                )
+                last_status = resp.status_code
 
-        for ml_url in MAJOR_LOGIN_URLS:
-            host = ml_url.split("//")[1].split("/")[0]
-            for attempt in range(retries):
-                try:
-                    h = {**headers, "Host": host, "Authorization": f"Bearer {access_token}"}
-                    resp = await self.http.post(ml_url, headers=h, content=payload, timeout=20)
-                    last_status = resp.status_code
-                    last_body = resp.content
+                if resp.status_code == 200 and len(resp.content) > 30:
+                    result = self._parse_major_login_response(resp.content)
+                    if result and result.get("token"):
+                        result["payload"] = payload  # Save for GetLoginData reuse
+                        logger.info(f"MajorLogin successful — region={result.get('region', '?')}, uid={result.get('account_uid', '?')}")
+                        return result
+                    logger.warning(f"MajorLogin: 200 OK but parse failed (body_len={len(resp.content)})")
+                elif resp.status_code == 200 and len(resp.content) <= 30:
+                    logger.warning(f"MajorLogin: 200 OK but tiny response ({len(resp.content)} bytes) — likely rejected")
+                else:
+                    logger.warning(f"MajorLogin attempt {attempt+1}: status={resp.status_code}, body_len={len(resp.content)}")
+            except Exception as e:
+                logger.warning(f"MajorLogin attempt {attempt+1}/{retries} failed: {e}")
+            await asyncio.sleep(2)
 
-                    if resp.status_code == 200 and len(resp.content) > 30:
-                        if b"Protection" in resp.content or b"Bypass" in resp.content:
-                            logger.warning(f"MajorLogin {host}: Protection Bypass detected. Trying next endpoint...")
-                            break
-
-                        result = self._parse_major_login_response(resp.content)
-                        if result and result.get("token"):
-                            result["payload"] = payload  # Save for GetLoginData reuse
-                            logger.info(f"MajorLogin successful via {host} — region={result.get('region', '?')}")
-                            return result
-
-                        result = self._parse_raw(resp.content)
-                        if result and result.get("token"):
-                            result["payload"] = payload
-                            return result
-                    else:
-                        logger.warning(f"MajorLogin {host} attempt {attempt+1}: status={resp.status_code}, body_len={len(resp.content)}")
-                except Exception as e:
-                    logger.warning(f"MajorLogin {host} attempt {attempt+1}/{retries} failed: {e}")
-                await asyncio.sleep(2)
-
-        logger.error(f"MajorLogin failed on all {len(MAJOR_LOGIN_URLS)} endpoints")
-        return {"error": "major_login_failed", "last_status": last_status, "last_body": last_body[:100].hex() if last_body else ""}
+        logger.error(f"MajorLogin failed after {retries} attempts (last status: {last_status})")
+        return {"error": "major_login_failed", "last_status": last_status}
 
     def _parse_major_login_response(self, content: bytes) -> Optional[dict]:
+        """Parse MajorLogin protobuf response — uses correct field names (key, iv, not ak, aiv)."""
         try:
-            import sys, os
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "level"))
-            from MajorLoginRes_pb2 import MajorLoginRes
-            from google.protobuf.timestamp_pb2 import Timestamp
+            from .Pb2.MajoRLoGinrEs_pb2 import MajorLoginRes
 
             msg = MajorLoginRes()
             msg.ParseFromString(content)
 
-            ts = Timestamp()
-            ts.FromNanoseconds(msg.kts)
-            combined = ts.seconds * 1_000_000_000 + ts.nanos
+            if not msg.token:
+                logger.warning("MajorLoginRes: no token in response (banned?)")
+                return None
 
-            key = msg.ak if isinstance(msg.ak, bytes) else bytes.fromhex(msg.ak)
-            iv = msg.aiv if isinstance(msg.aiv, bytes) else bytes.fromhex(msg.aiv)
+            key = msg.key if isinstance(msg.key, bytes) else bytes.fromhex(msg.key)
+            iv = msg.iv if isinstance(msg.iv, bytes) else bytes.fromhex(msg.iv)
+
+            # timestamp is a raw int64 (nanoseconds combined)
+            ts = msg.timestamp
 
             return {
                 "token": msg.token,
                 "key": key,
                 "iv": iv,
-                "timestamp": combined,
+                "timestamp": ts,
                 "url": msg.url if msg.url else LOGIN_DATA_URL_FALLBACK,
                 "region": msg.region if msg.region else "IND",
                 "account_uid": msg.account_uid if msg.account_uid else 0,
             }
         except Exception as e:
-            logger.warning(f"Protobuf parse failed: {e}, trying raw parser...")
+            logger.warning(f"Protobuf parse failed: {e}")
             return self._parse_raw(content)
 
     def _parse_raw(self, content: bytes) -> Optional[dict]:
+        """Fallback: parse MajorLogin response using raw protobuf decoder."""
         try:
             from protobuf_decoder.protobuf_decoder import Parser
 
@@ -277,37 +238,35 @@ class LevelAuth:
                             sub[sr.field] = sr.data
                     result_dict[r.field] = sub
 
-            token = result_dict.get(7, "")
+            token = result_dict.get(8, "")
             if isinstance(token, bytes):
                 token = token.decode("utf-8", errors="replace")
             if not token:
                 return None
 
-            key_raw = result_dict.get(18, b"")
-            iv_raw = result_dict.get(19, b"")
-            key = key_raw if isinstance(key_raw, bytes) else (bytes.fromhex(key_raw) if isinstance(key_raw, str) and all(c in "0123456789abcdef" for c in key_raw.lower()) else b"")
-            iv = iv_raw if isinstance(iv_raw, bytes) else (bytes.fromhex(iv_raw) if isinstance(iv_raw, str) and all(c in "0123456789abcdef" for c in iv_raw.lower()) else b"")
+            key_raw = result_dict.get(22, b"")
+            iv_raw = result_dict.get(23, b"")
+            key = key_raw if isinstance(key_raw, bytes) else b""
+            iv = iv_raw if isinstance(iv_raw, bytes) else b""
 
-            ts_data = result_dict.get(8, {})
-            combined = int(ts_data.get(1, 0)) * 1_000_000_000 + int(ts_data.get(2, 0)) if isinstance(ts_data, dict) else 0
-
-            url = result_dict.get(5, LOGIN_DATA_URL_FALLBACK)
+            url = result_dict.get(10, LOGIN_DATA_URL_FALLBACK)
             if isinstance(url, bytes):
                 url = url.decode("utf-8", errors="replace")
-            region = result_dict.get(4, "IND")
+            region = result_dict.get(2, "IND")
             if isinstance(region, bytes):
                 region = region.decode("utf-8", errors="replace")
+            account_uid = result_dict.get(1, 0)
 
             return {
                 "token": token if isinstance(token, str) else token.decode("utf-8", errors="replace"),
-                "key": key, "iv": iv, "timestamp": combined,
-                "url": url, "region": region, "account_uid": 0,
+                "key": key, "iv": iv, "timestamp": result_dict.get(21, 0),
+                "url": url, "region": region, "account_uid": account_uid,
             }
         except Exception as e:
             logger.error(f"Raw parse also failed: {e}")
             return None
 
-    # ── Step 3: GetLoginData ───────────────────────────────
+    # ── Step 3: GetLoginData (reuse MajorLogin payload) ────
 
     async def get_login_data(
         self, jwt_token: str, base_url: Optional[str] = None,
@@ -316,36 +275,25 @@ class LevelAuth:
     ) -> Optional[Tuple[str, int, str, int]]:
         url = base_url.rstrip("/") + "/GetLoginData" if base_url else LOGIN_DATA_URL_FALLBACK
 
-        # Reuse MajorLogin payload (same as ClanGloryBot) or build fresh
+        # Reuse MajorLogin payload (same as ClanGloryBot)
         if major_login_payload:
             payload = major_login_payload
         elif access_token:
-            payload = _build_payload(access_token, "")
+            payload = _build_major_login_payload("", access_token)
         else:
-            payload = _build_payload("", "")
+            logger.error("No payload available for GetLoginData")
+            return None
 
         host = url.split("//")[1].split("/")[0] if "//" in url else "clientbp.ggpolarbear.com"
-        headers = {
-            "X-Unity-Version": "2018.4.11f1",
-            "ReleaseVersion": "OB54",
-            "Content-Type": "application/octet-stream",
-            "X-GA": "v1 1",
-            "User-Agent": UA_DALVIK,
-            "Authorization": f"Bearer {jwt_token}",
-            "Host": host,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-        }
+        headers = {**HTTP_HEADERS, "Authorization": f"Bearer {jwt_token}", "Host": host}
 
         for attempt in range(retries):
             try:
                 resp = await self.http.post(url, headers=headers, content=payload, timeout=30)
                 if resp.status_code == 200 and len(resp.content) > 10:
-                    # Try PorTs_pb2 first (same as ClanGloryBot)
                     server_info = self._parse_server_info_pb(resp.content)
                     if server_info:
                         return server_info
-                    # Fallback to generic parser
                     server_info = self._parse_server_info(resp.content.hex())
                     if server_info:
                         return server_info
@@ -367,7 +315,6 @@ class LevelAuth:
             chat_addr = proto.AccountIP_Port
 
             if not online_addr or not chat_addr or ":" not in online_addr or ":" not in chat_addr:
-                logger.warning(f"PorTs_pb2: bad addresses: online={online_addr}, chat={chat_addr}")
                 return None
 
             online_ip, online_port = online_addr.rsplit(":", 1)
@@ -413,7 +360,7 @@ class LevelAuth:
             logger.error(f"Server info parse failed: {e}")
             return None
 
-    # ── Step 4: Connection Token (xC4) ─────────────────────
+    # ── Step 4: Connection Token (xC4 — same as ClanGloryBot) ──
 
     async def build_connection_token(self, jwt_token: str, key: bytes, iv: bytes, timestamp: int, account_id: int) -> str:
         from .xC4 import EnC_PacKeT, DecodE_HeX
