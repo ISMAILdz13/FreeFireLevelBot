@@ -30,6 +30,8 @@ import random
 import os
 import sys
 import json
+import hashlib
+import hmac
 from datetime import datetime
 
 # ── Protobuf ──
@@ -64,6 +66,18 @@ WAIT_AFTER_MATCH    = 20
 JOIN_DELAY          = 2.0
 LEAVE_DELAY         = 2.0
 CYCLE_DELAY         = 2.0
+
+# ── Garena guest registration constants ──
+HEX_KEY = "32656534343831396539623435393838343531343130363762323831363231383734643064356437616639643866376530306331653534373135623764316533"
+HMAC_KEY = bytes.fromhex(HEX_KEY)
+G_CLIENT_SECRET = HMAC_KEY.decode("ascii")
+G_CLIENT_ID = "100067"
+REGISTER_URL = "https://connect.garena.com/oauth/guest/register"
+OAUTH_V2_URL = "https://ffmconnect.live.gop.garenanow.com/api/v2/oauth/guest/token:grant"
+OAUTH_V1_URL = "https://100067.connect.garena.com/oauth/guest/token/grant"
+UA_REGISTER = "GarenaMSDK/4.0.19P10(I2404 ;Android 15;en;US;)"
+UA_OAUTH_V2 = "GarenaMSDK/4.0.19P10(I2404 ;Android 15;en;US;)"
+UA_OAUTH_V1 = "GarenaMSDK/4.0.19P8(ASUS_Z01QD ;Android 12;en;US;)"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -149,34 +163,112 @@ async def encrypted_proto(encoded_hex):
 # ═══════════════════════════════════════════════════════════════
 
 async def GeNeRaTeAccEss(uid, password):
-    """Get OAuth access token from Garena."""
-    url = "https://100067.connect.garena.com/oauth/guest/token/grant"
-    headers = {
+    """Get OAuth access token from Garena — tries V2 then V1."""
+    # V2 endpoint (JSON body)
+    v2_headers = {"Content-Type": "application/json; charset=utf-8", "User-Agent": UA_OAUTH_V2}
+    v2_data = {
+        "client_id": int(G_CLIENT_ID),
+        "client_secret": G_CLIENT_SECRET,
+        "password": str(password),
+        "client_type": 2,
+        "response_type": "token",
+        "uid": int(uid),
+    }
+    # V1 endpoint (form body)
+    v1_headers = {
         "Host": "100067.connect.garena.com",
-        "User-Agent": "GarenaMSDK/4.0.18P6(SM-A125F;Android 11;en-US;USA;)",
+        "User-Agent": UA_OAUTH_V1,
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "close",
     }
-    data = {
+    v1_data = {
         "uid": str(uid),
         "password": str(password),
         "response_type": "token",
         "client_type": "2",
         "client_secret": "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3",
-        "client_id": "100067",
+        "client_id": G_CLIENT_ID,
+    }
+
+    async with aiohttp.ClientSession() as session:
+        # Try V2 first
+        try:
+            print(f"  Trying OAuth V2 ({OAUTH_V2_URL})...")
+            async with session.post(OAUTH_V2_URL, json=v2_data, headers=v2_headers, ssl=False) as r:
+                print(f"  → V2: {r.status}")
+                if r.status == 200:
+                    j = await r.json()
+                    odata = j.get("data", j)
+                    oid = odata.get("open_id")
+                    tok = odata.get("access_token")
+                    if oid and tok:
+                        print(f"  ✅ V2 success!")
+                        return oid, tok
+        except Exception as e:
+            print(f"  → V2 error: {e}")
+
+        # Try V1
+        try:
+            print(f"  Trying OAuth V1 ({OAUTH_V1_URL})...")
+            async with session.post(OAUTH_V1_URL, data=v1_data, headers=v1_headers) as r:
+                print(f"  → V1: {r.status}")
+                if r.status == 200:
+                    j = await r.json()
+                    oid = j.get("open_id")
+                    tok = j.get("access_token")
+                    if oid and tok:
+                        print(f"  ✅ V1 success!")
+                        return oid, tok
+                else:
+                    body = await r.text()
+                    print(f"  → V1 body: {body[:200]}")
+        except Exception as e:
+            print(f"  → V1 error: {e}")
+
+    return None, None
+
+
+async def register_new_guest():
+    """Register a brand new guest account with Garena."""
+    password = ''.join(random.choices('0123456789abcdef', k=32))
+    sig = hmac.new(HMAC_KEY, password.encode(), hashlib.sha1).hexdigest()
+
+    print("  Registering new guest with Garena...")
+    headers = {
+        "Authorization": f"Signature {sig}",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": UA_REGISTER,
+        "Accept-Encoding": "gzip",
+        "Connection": "Keep-Alive",
+    }
+    data = {
+        "password": password,
+        "client_id": G_CLIENT_ID,
+        "client_type": "2",
+        "response_type": "token",
+        "signature": sig,
     }
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, data=data) as response:
-            print(f"  OAuth response: {response.status}")
-            if response.status != 200:
-                body = await response.text()
-                print(f"  OAuth body: {body[:200]}")
+        async with session.post(REGISTER_URL, data=data, headers=headers, ssl=False) as r:
+            print(f"  Register: {r.status}")
+            if r.status != 200:
+                body = await r.text()
+                print(f"  Register body: {body[:200]}")
                 return None, None
-            data = await response.json()
-            open_id = data.get("open_id")
-            access_token = data.get("access_token")
-            return (open_id, access_token) if open_id and access_token else (None, None)
+            j = await r.json()
+            uid = j.get("uid")
+            if not uid:
+                print(f"  No UID in response: {j}")
+                return None, None
+            print(f"  ✅ Got UID: {uid}")
+
+    # Get OAuth tokens for the new account
+    open_id, access_token = await GeNeRaTeAccEss(uid, password)
+    if not open_id:
+        print("  ⚠️ OAuth failed for new account")
+        return str(uid), password, None, None
+    return str(uid), password, open_id, access_token
 
 async def EncRypTMajoRLoGin(open_id, access_token):
     """Build MajorLogin protobuf and encrypt it."""
@@ -562,6 +654,9 @@ async def main():
     print("=" * 55)
 
     # ── Step 1: Get open_id + access_token ──
+    open_id = None
+    access_token = None
+
     if use_stored_tokens:
         print(f"\n📡 Step 1: Using stored tokens from guests.json...")
         open_id = cred["open_id"]
@@ -571,13 +666,32 @@ async def main():
     else:
         print(f"\n📡 Step 1: Getting access token via OAuth...")
         open_id, access_token = await GeNeRaTeAccEss(uid, password)
-        if not open_id or not access_token:
-            print("❌ Failed to get access token")
-            print("  Try --guests to use stored tokens instead:")
-            print(f"  python3 level_bot_real.py --guests ../data/guests.json 1 {team_code}")
+        if open_id:
+            print(f"  ✅ open_id: {open_id}")
+            print(f"  ✅ token:   {access_token[:20]}...")
+
+    if not open_id and cred.get("password"):
+        # Try OAuth with stored password
+        print(f"\n📡 Step 1b: Trying OAuth with stored password...")
+        open_id, access_token = await GeNeRaTeAccEss(uid, cred["password"])
+        if open_id:
+            print(f"  ✅ open_id: {open_id}")
+            print(f"  ✅ token:   {access_token[:20]}...")
+
+    if not open_id:
+        # Last resort: register a new guest
+        print(f"\n📡 Step 1c: All tokens expired. Registering fresh guest...")
+        new_uid, new_pwd, new_oid, new_tok = await register_new_guest()
+        if new_oid:
+            uid = new_uid
+            open_id = new_oid
+            access_token = new_tok
+            print(f"  ✅ New guest: UID={uid}")
+            print(f"  ✅ open_id: {open_id}")
+            print(f"  ✅ token:   {access_token[:20]}...")
+        else:
+            print("❌ Could not get tokens — try running gen_guest.py first")
             return
-        print(f"  ✅ open_id: {open_id}")
-        print(f"  ✅ token:   {access_token[:20]}...")
 
     # ── Step 2: MajorLogin ──
     print("\n📡 Step 2: MajorLogin...")
@@ -585,8 +699,9 @@ async def main():
     login_response = await MajorLogin(payload)
     if not login_response:
         print("❌ MajorLogin failed — all endpoints returned rejection")
-        print("  The stored tokens may be expired. Try OAuth with a hex password:")
-        print(f"  python3 level_bot_real.py --accounts ../data/level_accounts.json 5822030305 {team_code}")
+        print("  Tokens may be expired. Try:")
+        print("  1. python3 gen_guest.py  (generate fresh guest)")
+        print("  2. python3 level_bot_real.py --accounts ../data/level_accounts.json <uid> <team_code>")
         return
 
     print(f"  ✅ Got login response: {len(login_response)} bytes")
