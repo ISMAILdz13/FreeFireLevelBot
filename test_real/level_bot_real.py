@@ -452,22 +452,55 @@ async def open_squad_packet(key, iv):
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
 
-async def start_auto_packet(key, iv):
-    """Start match packet — field 1=9, field 2={1: 12480598706}."""
-    fields = {
-        1: 9,
+async def start_match_leader_packet(account_uid, key, iv):
+    """Send 3 start-match packets like ClanGloryBot start_match_leader:
+    1. Field 269 (detailed start with device info) — match trigger
+    2. Field 214 (simple start)
+    3. Field 9 (ready signal with account_uid)
+    Returns list of 3 packets."""
+    pkt_type = '0515'
+
+    # 1. Detailed start with device info (field 1=269)
+    fields_detailed = {
+        1: 269,
         2: {
-            1: 12480598706,
-        },
+            1: 8, 2: 8, 3: 11, 4: 1,
+            5: "samsung", 6: "SM-A145F", 7: "arm64-v8a",
+            8: "f538dc9b-cec9-43cd-8125-95f7f4f1f7e3",
+            9: "FFD58FB4F76F648C2A5E21EBCFA3AAE81B4C9B7D97",
+            10: "voice", 11: "V2059", 12: "mt6785",
+            13: "AFFD58FB4F76F648C2A5E21EBCFA3AAE81B4C9B7D97",
+            14: "ME_1999120752610979840",
+            15: 269
+        }
     }
+    pkt_269 = await GeneRaTePk((await CrEaTe_ProTo(fields_detailed)).hex(), pkt_type, key, iv)
+
+    # 2. Simple start (field 1=214)
+    fields_214 = {1: 214, 2: {1: 1}}
+    pkt_214 = await GeneRaTePk((await CrEaTe_ProTo(fields_214)).hex(), pkt_type, key, iv)
+
+    # 3. Ready signal (field 1=9) with ACCOUNT UID
+    fields_9 = {1: 9, 2: {1: int(account_uid)}}
+    pkt_9 = await GeneRaTePk((await CrEaTe_ProTo(fields_9)).hex(), pkt_type, key, iv)
+
+    return [pkt_269, pkt_214, pkt_9]
+
+
+async def spam_ready_packet(account_uid, key, iv):
+    """Build the spam packet: field 1=9, field 2={1: account_uid}.
+    Uses ACCOUNT UID, not hardcoded value."""
+    fields = {1: 9, 2: {1: int(account_uid)}}
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
-async def leave_squad_packet(key, iv):
+
+
+async def leave_squad_packet(account_uid, key, iv):
     """Leave squad — field 1=7, field 2={1: 12480598706}."""
     fields = {
         1: 7,
         2: {
-            1: 12480598706,
+            1: int(account_uid),
         },
     }
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
@@ -478,66 +511,63 @@ async def leave_squad_packet(key, iv):
 # ═══════════════════════════════════════════════════════════════
 
 async def auto_start_loop(team_code, online_writer, key, iv,
+                           account_uid=None,
                            spam_duration=START_SPAM_DURATION,
                            spam_delay=START_SPAM_DELAY,
                            wait_after_match=WAIT_AFTER_MATCH,
                            max_cycles=1000):
-    """Auto start loop: open squad -> spam start -> wait -> leave -> repeat."""
+    """Solo farming: send start_match_leader (3 packets) + spam ready."""
 
     cycle_count = 0
 
-    print(f"\n🚀 Auto start loop — SOLO MODE")
-    print(f"⚡ Open → Start → Wait({wait_after_match}s) → Leave → Repeat\n")
+    print(f"\n🚀 Auto start loop — SOLO MODE (ClanGloryBot style)")
+    print(f"⚡ Start(269+214+9) → Spam(9) → Wait({wait_after_match}s) → Repeat\n")
 
-    # ── Init: Open own squad ──
-    print("  → Opening own squad...")
-    open_pkt = await open_squad_packet(key, iv)
-    online_writer.write(open_pkt)
-    await online_writer.drain()
-    await asyncio.sleep(2)
-    print("  ✅ Own squad opened")
-
-    leave_pkt = await leave_squad_packet(key, iv)
+    # Pre-build packets
+    leader_pkts = await start_match_leader_packet(account_uid, key, iv)
+    spam_pkt = await spam_ready_packet(account_uid, key, iv)
+    leave_pkt = await leave_squad_packet(account_uid, key, iv)
 
     while cycle_count < max_cycles:
         try:
             cycle_count += 1
             print(f"\n🔄 Cycle #{cycle_count}")
 
-            # ── Step 1: Spam start match (field 1=9) ──
-            print(f"  → Spamming start match ({spam_duration}s)...")
-            start_packet = await start_auto_packet(key, iv)
+            # ── Step 1: Send 3 start-match packets ──
+            print(f"  → Sending start_match_leader (269, 214, 9)...")
+            for pkt in leader_pkts:
+                online_writer.write(pkt)
+                await online_writer.drain()
+                await asyncio.sleep(0.5)
+            print(f"  ✅ Leader packets sent")
+
+            # ── Step 2: Spam ready signal (field 1=9) ──
+            print(f"  → Spamming ready signal ({spam_duration}s)...")
             end_time = time.time() + spam_duration
             spam_count = 0
 
             while time.time() < end_time:
-                online_writer.write(start_packet)
+                online_writer.write(spam_pkt)
                 await online_writer.drain()
                 spam_count += 1
                 await asyncio.sleep(spam_delay)
 
-            print(f"  📮 Sent {spam_count} start packets")
+            print(f"  📮 Sent {spam_count} ready packets")
 
-            # ── Step 2: Wait for match to complete ──
+            # ── Step 3: Wait for match ──
             print(f"  ⏳ Waiting {wait_after_match}s for match...")
             waited = 0
             while waited < wait_after_match:
                 await asyncio.sleep(1)
                 waited += 1
 
-            # ── Step 3: Leave + reopen squad ──
+            # ── Step 4: Leave squad (reset for next cycle) ──
             print(f"  🚪 Leaving squad...")
             online_writer.write(leave_pkt)
             await online_writer.drain()
             await asyncio.sleep(1)
-
-            print(f"  → Reopening squad...")
-            online_writer.write(open_pkt)
-            await online_writer.drain()
-            await asyncio.sleep(1)
             print(f"  ✅ Cycle {cycle_count} done")
 
-            # ── Step 4: Cycle delay ──
             await asyncio.sleep(CYCLE_DELAY)
 
         except Exception as e:
@@ -547,11 +577,6 @@ async def auto_start_loop(team_code, online_writer, key, iv,
             await asyncio.sleep(3)
 
     print(f"\n🛑 Auto start loop stopped after {cycle_count} cycles")
-
-
-# ═══════════════════════════════════════════════════════════════
-#  Online reader — reads server responses (for debugging)
-# ═══════════════════════════════════════════════════════════════
 
 async def read_online(reader, key, iv):
     """Read packets from online server — parse as protobuf."""
@@ -809,7 +834,7 @@ async def main():
     print("\n🚀 Starting level bot + packet reader...\n")
 
     reader_task = asyncio.create_task(read_online(reader, key, iv))
-    loop_task = asyncio.create_task(auto_start_loop(team_code, writer, key, iv))
+    loop_task = asyncio.create_task(auto_start_loop(team_code, writer, key, iv, account_uid=account_uid))
 
     try:
         await loop_task
