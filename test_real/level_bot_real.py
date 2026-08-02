@@ -427,6 +427,31 @@ async def join_teamcode_packet(team_code, key, iv):
     }
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
+async def open_squad_packet(key, iv):
+    """Open/create own squad — OpEnSq from OB54-TCP-BOT.
+    Field 1=1 means 'open squad' (create new squad)."""
+    fields = {
+        1: 1,
+        2: {
+            2: "\u0001",
+            3: 1,
+            4: 1,
+            5: "en",
+            9: 1,
+            11: 1,
+            13: 1,
+            14: {
+                2: 5756,
+                6: 11,
+                8: "1.126.2",
+                9: 2,
+                10: 4,
+            },
+        },
+    }
+    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
+
+
 async def start_auto_packet(key, iv):
     """Start match packet — field 1=9, field 2={1: 12480598706}."""
     fields = {
@@ -464,18 +489,38 @@ async def auto_start_loop(team_code, online_writer, key, iv,
     print(f"\n🚀 Auto start loop — team: {team_code}")
     print(f"⚡ Join → Start → Wait({wait_after_match}s) → Leave → Repeat\n")
 
+    # ── Init: Reset to solo + open squad ──
+    print("  → Resetting to solo mode...")
+    leave_pkt = await leave_squad_packet(key, iv)
+    online_writer.write(leave_pkt)
+    await online_writer.drain()
+    await asyncio.sleep(1)
+    print("  ✅ Left any existing squad")
+
+    print("  → Opening own squad...")
+    open_pkt = await open_squad_packet(key, iv)
+    online_writer.write(open_pkt)
+    await online_writer.drain()
+    await asyncio.sleep(1)
+    print("  ✅ Own squad opened")
+
     while cycle_count < max_cycles:
         try:
             cycle_count += 1
             print(f"\n🔄 Cycle #{cycle_count}")
 
-            # ── Step 1: Join team ──
+            # ── Step 1: Leave current squad + join team ──
+            print(f"  → Leaving current squad...")
+            online_writer.write(leave_pkt)
+            await online_writer.drain()
+            await asyncio.sleep(0.5)
+
             print(f"  → Joining team {team_code}...")
             join_packet = await join_teamcode_packet(team_code, key, iv)
             online_writer.write(join_packet)
             await online_writer.drain()
             await asyncio.sleep(JOIN_DELAY)
-            print(f"  ✅ Joined team {team_code}")
+            print(f"  ✅ Join sent for team {team_code}")
 
             # ── Step 2: Spam start match (field 1=9) ──
             print(f"  → Spamming start match ({spam_duration}s)...")
@@ -500,8 +545,7 @@ async def auto_start_loop(team_code, online_writer, key, iv,
 
             # ── Step 4: Leave squad ──
             print(f"  🚪 Leaving team...")
-            leave_packet = await leave_squad_packet(key, iv)
-            online_writer.write(leave_packet)
+            online_writer.write(leave_pkt)
             await online_writer.drain()
             await asyncio.sleep(LEAVE_DELAY)
             print(f"  ✅ Left team — cycle {cycle_count} done")
