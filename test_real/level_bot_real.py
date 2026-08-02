@@ -8,10 +8,18 @@ Flow:
   3. auto_start_loop: join team → spam start → wait → leave → repeat
 
 Usage:
+  # From guests.json (uses stored open_id + access_token — skips OAuth):
+  python3 level_bot_real.py --guests ../data/guests.json 1 <team_code>
+
+  # From level_accounts.json (does OAuth with hex password):
+  python3 level_bot_real.py --accounts ../data/level_accounts.json 5822030305 <team_code>
+
+  # Direct uid + password:
   python3 level_bot_real.py <uid> <password> <team_code>
 
-  Example:
-  python3 level_bot_real.py 5842511863 your_password 2781283
+  Examples:
+  python3 level_bot_real.py --guests ../data/guests.json 1 2781283
+  python3 level_bot_real.py --accounts ../data/level_accounts.json 5822030305 2781283
 """
 
 import asyncio
@@ -25,7 +33,7 @@ import json
 from datetime import datetime
 
 # ── Protobuf ──
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'Pb2'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Pb2'))
 import MajoRLoGinrEq_pb2
 import MajoRLoGinrEs_pb2
 import PorTs_pb2
@@ -61,14 +69,6 @@ CYCLE_DELAY         = 2.0
 # ═══════════════════════════════════════════════════════════════
 #  xC4.py — Packet building & encryption (1:1 copy)
 # ═══════════════════════════════════════════════════════════════
-
-async def EnC_AEs(HeX):
-    cipher = AES.new(DEFAULT_KEY, AES.MODE_CBC, DEFAULT_IV)
-    return cipher.encrypt(pad(bytes.fromhex(HeX), AES.block_size)).hex()
-
-async def DEc_AEs(HeX):
-    cipher = AES.new(DEFAULT_KEY, AES.MODE_CBC, DEFAULT_IV)
-    return unpad(cipher.decrypt(bytes.fromhex(HeX)), AES.block_size).hex()
 
 async def EnC_PacKeT(HeX, K, V):
     return AES.new(K, AES.MODE_CBC, V).encrypt(pad(bytes.fromhex(HeX), 16)).hex()
@@ -119,8 +119,7 @@ async def DecodE_HeX(H):
     return F
 
 async def GeneRaTePk(Pk, N, K, V):
-    """Encrypt protobuf and build final packet with header.
-    N = packet type (e.g. '0515'), K = key, V = iv."""
+    """Encrypt protobuf and build final packet with header."""
     PkEnc = await EnC_PacKeT(Pk, K, V)
     _ = await DecodE_HeX(int(len(PkEnc) // 2))
     if len(_) == 2:    HeadEr = N + "000000"
@@ -160,8 +159,8 @@ async def GeNeRaTeAccEss(uid, password):
         "Connection": "close",
     }
     data = {
-        "uid": uid,
-        "password": password,
+        "uid": str(uid),
+        "password": str(password),
         "response_type": "token",
         "client_type": "2",
         "client_secret": "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3",
@@ -169,8 +168,10 @@ async def GeNeRaTeAccEss(uid, password):
     }
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, data=data) as response:
+            print(f"  OAuth response: {response.status}")
             if response.status != 200:
-                print(f"❌ OAuth failed: {response.status}")
+                body = await response.text()
+                print(f"  OAuth body: {body[:200]}")
                 return None, None
             data = await response.json()
             open_id = data.get("open_id")
@@ -240,17 +241,29 @@ async def EncRypTMajoRLoGin(open_id, access_token):
     return await encrypted_proto(string)
 
 async def MajorLogin(payload):
-    """Send MajorLogin request."""
-    url = "https://loginbp.ggpolarbear.com/MajorLogin"
+    """Send MajorLogin request — tries all 3 endpoints."""
+    urls = [
+        "https://loginbp.ggpolarbear.com/MajorLogin",
+        "https://loginbp.ggwhitehawk.com/MajorLogin",
+        "https://loginbp.ggblueshark.com/MajorLogin",
+    ]
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=payload, headers=HEADERS, ssl=ssl_context) as response:
-            if response.status == 200:
-                return await response.read()
-            print(f"❌ MajorLogin failed: {response.status}")
-            return None
+        for url in urls:
+            try:
+                print(f"  Trying {url}...")
+                async with session.post(url, data=payload, headers=HEADERS, ssl=ssl_context) as response:
+                    body = await response.read()
+                    print(f"  → {response.status}, {len(body)} bytes")
+                    if response.status == 200 and len(body) > 30:
+                        return body
+                    elif response.status == 200:
+                        print(f"  ⚠️ 200 but only {len(body)} bytes — rejection")
+            except Exception as e:
+                print(f"  → Error: {e}")
+    return None
 
 async def GetLoginData(base_url, payload, token):
     """Get server IPs and ports."""
@@ -302,7 +315,7 @@ async def xAuThSTarTuP(TarGeT, token, timestamp, key, iv):
 #  Level bot packets (1:1 copy from OB54-TCP-BOT)
 # ═══════════════════════════════════════════════════════════════
 
-async def join_teamcode_packet(team_code, key, iv, region):
+async def join_teamcode_packet(team_code, key, iv):
     """Join team using code — 1:1 with OB54-TCP-BOT join_teamcode_packet."""
     fields = {
         1: 4,
@@ -320,60 +333,53 @@ async def join_teamcode_packet(team_code, key, iv, region):
             },
         },
     }
-    packet_type = '0515'
-    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
+    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
-async def start_auto_packet(key, iv, region):
-    """Start match packet — 1:1 with OB54-TCP-BOT start_auto_packet / FS.
-    Field 1=9, field 2={1: UID}."""
+async def start_auto_packet(uid, key, iv):
+    """Start match packet — field 1=9, field 2={1: UID}."""
     fields = {
         1: 9,
         2: {
-            1: 12480598706,
+            1: uid,
         },
     }
-    packet_type = '0515'
-    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
+    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
-async def leave_squad_packet(key, iv, region):
-    """Leave squad — 1:1 with OB54-TCP-BOT leave_squad.
-    Field 1=7, field 2={1: UID}."""
+async def leave_squad_packet(uid, key, iv):
+    """Leave squad — field 1=7, field 2={1: UID}."""
     fields = {
         1: 7,
         2: {
-            1: 12480598706,
+            1: uid,
         },
     }
-    packet_type = '0515'
-    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
+    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0515', key, iv)
 
 
 # ═══════════════════════════════════════════════════════════════
 #  auto_start_loop — THE REAL LEVEL BOT LOOP (1:1 copy)
 # ═══════════════════════════════════════════════════════════════
 
-async def auto_start_loop(team_code, online_writer, key, iv, region,
+async def auto_start_loop(team_code, online_writer, key, iv, bot_uid,
                            spam_duration=START_SPAM_DURATION,
                            spam_delay=START_SPAM_DELAY,
                            wait_after_match=WAIT_AFTER_MATCH,
                            max_cycles=1000):
-    """Auto start loop: join → spam start → wait → leave → repeat.
-    This is the EXACT flow from OB54-TCP-BOT auto_start_loop."""
+    """Auto start loop: join → spam start → wait → leave → repeat."""
 
     cycle_count = 0
-    stop = False
 
     print(f"\n🚀 Auto start loop — team: {team_code}")
     print(f"⚡ Join → Start → Wait({wait_after_match}s) → Leave → Repeat\n")
 
-    while not stop and cycle_count < max_cycles:
+    while cycle_count < max_cycles:
         try:
             cycle_count += 1
             print(f"\n🔄 Cycle #{cycle_count}")
 
             # ── Step 1: Join team ──
             print(f"  → Joining team {team_code}...")
-            join_packet = await join_teamcode_packet(team_code, key, iv, region)
+            join_packet = await join_teamcode_packet(team_code, key, iv)
             online_writer.write(join_packet)
             await online_writer.drain()
             await asyncio.sleep(JOIN_DELAY)
@@ -381,11 +387,11 @@ async def auto_start_loop(team_code, online_writer, key, iv, region,
 
             # ── Step 2: Spam start match (field 1=9) ──
             print(f"  → Spamming start match ({spam_duration}s)...")
-            start_packet = await start_auto_packet(key, iv, region)
+            start_packet = await start_auto_packet(bot_uid, key, iv)
             end_time = time.time() + spam_duration
             spam_count = 0
 
-            while time.time() < end_time and not stop:
+            while time.time() < end_time:
                 online_writer.write(start_packet)
                 await online_writer.drain()
                 spam_count += 1
@@ -396,13 +402,13 @@ async def auto_start_loop(team_code, online_writer, key, iv, region,
             # ── Step 3: Wait for match to complete ──
             print(f"  ⏳ Waiting {wait_after_match}s for match...")
             waited = 0
-            while waited < wait_after_match and not stop:
+            while waited < wait_after_match:
                 await asyncio.sleep(1)
                 waited += 1
 
             # ── Step 4: Leave squad ──
             print(f"  🚪 Leaving team...")
-            leave_packet = await leave_squad_packet(key, iv, region)
+            leave_packet = await leave_squad_packet(bot_uid, key, iv)
             online_writer.write(leave_packet)
             await online_writer.drain()
             await asyncio.sleep(LEAVE_DELAY)
@@ -433,22 +439,63 @@ async def read_online(reader, key, iv):
                 print("  ⚠️ Server closed connection")
                 break
             data_hex = data.hex()
-            # Log packet type (first 4 hex chars)
             pkt_type = data_hex[:4] if len(data_hex) >= 4 else "?"
             pkt_len = len(data)
-            # Try to decrypt
             if len(data_hex) > 8:
                 try:
-                    encrypted_hex = data_hex[8:]  # Skip header (4 bytes type + 4 bytes length)
+                    # Try to decrypt the payload
+                    encrypted_hex = data_hex[8:]
                     decrypted = await DEc_PacKeT(encrypted_hex, key, iv)
-                    print(f"  📥 RX [{pkt_type}] {pkt_len}B → {decrypted[:80]}...")
+                    # Parse first few fields
+                    print(f"  📥 RX [{pkt_type}] {pkt_len}B → {decrypted[:100]}...")
                 except:
-                    print(f"  📥 RX [{pkt_type}] {pkt_len}B (encrypted)")
+                    print(f"  📥 RX [{pkt_type}] {pkt_len}B (encrypted, type={pkt_type})")
             else:
                 print(f"  📥 RX [{pkt_type}] {pkt_len}B")
+        except asyncio.CancelledError:
+            break
         except Exception as e:
             print(f"  ⚠️ Read error: {e}")
             break
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Credential loading
+# ═══════════════════════════════════════════════════════════════
+
+def load_from_guests(path, index):
+    """Load guest from guests.json — uses stored open_id + access_token."""
+    with open(path) as f:
+        guests = json.load(f)
+    idx = int(index) - 1
+    if idx < 0 or idx >= len(guests):
+        print(f"❌ Guest index {index} out of range (1-{len(guests)})")
+        sys.exit(1)
+    g = guests[idx]
+    return {
+        "uid": g["uid"],
+        "password": g.get("password", ""),
+        "open_id": g.get("open_id", ""),
+        "access_token": g.get("access_token", ""),
+        "name": g.get("name", ""),
+        "region": g.get("region", "ME"),
+    }
+
+def load_from_accounts(path, uid):
+    """Load from level_accounts.json — hex password for OAuth."""
+    with open(path) as f:
+        accounts = json.load(f)
+    uid_str = str(uid)
+    if uid_str not in accounts:
+        print(f"❌ UID {uid_str} not found in {path}")
+        print(f"   Available: {list(accounts.keys())}")
+        sys.exit(1)
+    return {
+        "uid": uid_str,
+        "password": accounts[uid_str],
+        "open_id": None,
+        "access_token": None,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -456,42 +503,90 @@ async def read_online(reader, key, iv):
 # ═══════════════════════════════════════════════════════════════
 
 async def main():
+    args = sys.argv[1:]
+
     # Parse args
-    if len(sys.argv) < 4:
-        print("Usage: python3 level_bot_real.py <uid> <password> <team_code>")
-        print("Example: python3 level_bot_real.py 5842511863 your_pass 2781283")
-        sys.exit(1)
+    if len(args) >= 1 and args[0] == '--guests':
+        # --guests <path> <index> <team_code>
+        if len(args) < 4:
+            print("Usage: python3 level_bot_real.py --guests <path> <index> <team_code>")
+            print("Example: python3 level_bot_real.py --guests ../data/guests.json 1 2781283")
+            sys.exit(1)
+        guests_path = args[1]
+        guest_index = args[2]
+        team_code = args[3]
+        cred = load_from_guests(guests_path, guest_index)
+        use_stored_tokens = bool(cred["open_id"] and cred["access_token"])
 
-    uid = sys.argv[1]
-    password = sys.argv[2]
-    team_code = sys.argv[3]
-    region = "ME"  # Default region
+    elif len(args) >= 1 and args[0] == '--accounts':
+        # --accounts <path> <uid> <team_code>
+        if len(args) < 4:
+            print("Usage: python3 level_bot_real.py --accounts <path> <uid> <team_code>")
+            print("Example: python3 level_bot_real.py --accounts ../data/level_accounts.json 5822030305 2781283")
+            sys.exit(1)
+        accounts_path = args[1]
+        uid = args[2]
+        team_code = args[3]
+        cred = load_from_accounts(accounts_path, uid)
+        use_stored_tokens = False
 
-    print("=" * 50)
+    else:
+        # Direct: <uid> <password> <team_code>
+        if len(args) < 3:
+            print("Usage:")
+            print("  python3 level_bot_real.py --guests <path> <index> <team_code>")
+            print("  python3 level_bot_real.py --accounts <path> <uid> <team_code>")
+            print("  python3 level_bot_real.py <uid> <password> <team_code>")
+            sys.exit(1)
+        cred = {
+            "uid": args[0],
+            "password": args[1],
+            "open_id": None,
+            "access_token": None,
+        }
+        team_code = args[2]
+        use_stored_tokens = False
+
+    uid = cred["uid"]
+    password = cred.get("password", "")
+    region = cred.get("region", "ME")
+
+    print("=" * 55)
     print("  REAL LEVEL BOT — OB54-TCP-BOT 1:1")
-    print("=" * 50)
+    print("=" * 55)
     print(f"  UID:       {uid}")
     print(f"  Team:      {team_code}")
+    print(f"  Auth:      {'stored tokens (skip OAuth)' if use_stored_tokens else 'OAuth (uid+password)'}")
     print(f"  Spam:      {START_SPAM_DURATION}s (delay {START_SPAM_DELAY}s)")
     print(f"  Wait:      {WAIT_AFTER_MATCH}s")
-    print("=" * 50)
+    print("=" * 55)
 
-    # ── Step 1: Get OAuth access token ──
-    print("\n📡 Step 1: Getting access token...")
-    open_id, access_token = await GeNeRaTeAccEss(uid, password)
-    if not open_id or not access_token:
-        print("❌ Failed to get access token — check UID/password")
-        return
-
-    print(f"  ✅ open_id: {open_id}")
-    print(f"  ✅ token:   {access_token[:30]}...")
+    # ── Step 1: Get open_id + access_token ──
+    if use_stored_tokens:
+        print(f"\n📡 Step 1: Using stored tokens from guests.json...")
+        open_id = cred["open_id"]
+        access_token = cred["access_token"]
+        print(f"  ✅ open_id: {open_id}")
+        print(f"  ✅ token:   {access_token[:20]}...")
+    else:
+        print(f"\n📡 Step 1: Getting access token via OAuth...")
+        open_id, access_token = await GeNeRaTeAccEss(uid, password)
+        if not open_id or not access_token:
+            print("❌ Failed to get access token")
+            print("  Try --guests to use stored tokens instead:")
+            print(f"  python3 level_bot_real.py --guests ../data/guests.json 1 {team_code}")
+            return
+        print(f"  ✅ open_id: {open_id}")
+        print(f"  ✅ token:   {access_token[:20]}...")
 
     # ── Step 2: MajorLogin ──
     print("\n📡 Step 2: MajorLogin...")
     payload = await EncRypTMajoRLoGin(open_id, access_token)
     login_response = await MajorLogin(payload)
     if not login_response:
-        print("❌ MajorLogin failed — account may be banned")
+        print("❌ MajorLogin failed — all endpoints returned rejection")
+        print("  The stored tokens may be expired. Try OAuth with a hex password:")
+        print(f"  python3 level_bot_real.py --accounts ../data/level_accounts.json 5822030305 {team_code}")
         return
 
     print(f"  ✅ Got login response: {len(login_response)} bytes")
@@ -536,7 +631,7 @@ async def main():
     # ── Step 5: Build auth token for TCP ──
     print("\n📡 Step 5: Building TCP auth token...")
     auth_token = await xAuThSTarTuP(int(account_uid), token, int(timestamp), key, iv)
-    print(f"  ✅ Auth token: {auth_token[:60]}...")
+    print(f"  ✅ Auth token: {len(auth_token)} chars")
 
     # ── Step 6: TCP connect to Online server ──
     print(f"\n📡 Step 6: Connecting to {online_ip}:{online_port}...")
@@ -555,15 +650,14 @@ async def main():
     await writer.drain()
     print(f"  ✅ Auth token sent ({len(auth_bytes)} bytes)")
 
-    # Wait a moment for server to process auth
+    # Wait for server to process auth
     await asyncio.sleep(2)
 
     # ── Step 8: Start level bot loop + reader ──
     print("\n🚀 Starting level bot + packet reader...\n")
 
-    # Run reader and loop concurrently
     reader_task = asyncio.create_task(read_online(reader, key, iv))
-    loop_task = asyncio.create_task(auto_start_loop(team_code, writer, key, iv, region))
+    loop_task = asyncio.create_task(auto_start_loop(team_code, writer, key, iv, int(account_uid)))
 
     try:
         await loop_task
