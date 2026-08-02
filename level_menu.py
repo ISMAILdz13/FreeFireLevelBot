@@ -131,7 +131,7 @@ async def run_bot(uid, password, team_code, spam_duration=18, spam_delay=0.2,
     print(f"  {C.CY}----------------------------------------{C.R}")
     print(f"  {C.B}Starting Level Bot...{C.R}")
     print(f"  {C.D}UID:  {C.W}{uid}{C.R}")
-    print(f"  {C.D}Team: {C.W}{team_code}{C.R}")
+    print(f"  {C.D}Squad: {C.W}{team_code}{C.R}")
     print(f"  {C.D}Spam: {C.W}{spam_duration}s{C.D} (delay {spam_delay}s){C.R}")
     print(f"  {C.D}Wait: {C.W}{wait_after}s{C.R}")
     print(f"  {C.D}Cycles: {C.W}{'infinite' if max_cycles >= 999999 else max_cycles}{C.R}")
@@ -173,14 +173,15 @@ def opt1_quick():
         input(f"\n  {C.D}Press Enter...{C.R}")
         return
 
-    team_code = input(f"  {C.CY}Team code: {C.W}").strip()
-    if not team_code or not team_code.isdigit():
-        print(f"  {C.R1}Invalid! Digits only.{C.R}")
+    squad_code = input(f"  {C.CY}Squad code {C.D}(or 'solo' to open own):{C.W} ").strip()
+    if not squad_code:
+        print(f"  {C.R1}Empty! Enter a squad code or 'solo'.{C.R}")
         input(f"\n  {C.D}Press Enter...{C.R}")
         return
 
+    code = "" if squad_code.lower() == "solo" else squad_code
     asyncio.run(run_bot(
-        uid=guest["uid"], password=guest["password"], team_code=team_code,
+        uid=guest["uid"], password=guest["password"], team_code=code,
     ))
 
 
@@ -199,12 +200,13 @@ def opt2_custom():
         input(f"\n  {C.D}Press Enter...{C.R}")
         return
 
-    team_code = input(f"  {C.CY}Team code: {C.W}").strip()
-    if not team_code or not team_code.isdigit():
-        print(f"  {C.R1}Invalid! Digits only.{C.R}")
+    squad_code = input(f"  {C.CY}Squad code {C.D}(or 'solo' to open own):{C.W} ").strip()
+    if not squad_code:
+        print(f"  {C.R1}Empty! Enter a squad code or 'solo'.{C.R}")
         input(f"\n  {C.D}Press Enter...{C.R}")
         return
 
+    code = "" if squad_code.lower() == "solo" else squad_code
     def num(prompt, default, lo=1, hi=9999):
         raw = input(f"  {C.CY}{prompt} {C.D}[{default}]:{C.W} ").strip()
         if not raw:
@@ -232,7 +234,7 @@ def opt2_custom():
     max_cyc  = num("Max cycles (0=inf)", 0, 0, 99999)
 
     asyncio.run(run_bot(
-        uid=guest["uid"], password=guest["password"], team_code=team_code,
+        uid=guest["uid"], password=guest["password"], team_code=code,
         spam_duration=spam_dur, spam_delay=spam_dly,
         wait_after=wait_af, max_cycles=max_cyc,
     ))

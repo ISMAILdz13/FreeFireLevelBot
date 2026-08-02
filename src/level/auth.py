@@ -304,8 +304,7 @@ class LevelAuth:
             logger.error("No payload available for GetLoginData")
             return None
 
-        host = url.split("//")[1].split("/")[0] if "//" in url else "clientbp.ggpolarbear.com"
-        headers = {**HTTP_HEADERS, "Authorization": f"Bearer {jwt_token}", "Host": host}
+        headers = {**HTTP_HEADERS, "Authorization": f"Bearer {jwt_token}"}
 
         for attempt in range(retries):
             try:
