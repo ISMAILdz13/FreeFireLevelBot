@@ -6,7 +6,7 @@
     "region": "ME",
     "status": "registered",
     "open_id": "14c795ca2e7da7c7ae5c1c86ebcf122a",
-    "access_token": "4b2ae84cedc48bb428c32a2c51701cdd72ce456c9b76d0719ae7c07580ce8e76"
+    "access_token": "20b2948827427e2439f5522349acf57c62d45be651bb5a029802fc1ec70fcf60"
   },
   {
     "uid": "5842511867",
@@ -15,7 +15,7 @@
     "region": "ME",
     "status": "registered",
     "open_id": "6c25c9e6ab74750a16c8c62002b62bf0",
-    "access_token": "b2d361e04a206f8481e0cd7a510cb19d083e7960cd6817bf818cfcebf8ba7b3e"
+    "access_token": "f3f26cfc9238dfbc3f7e9d7c3179dfe360beb3b53d31951d198a286cbb547b2c"
   },
   {
     "uid": "5842511864",
@@ -24,6 +24,15 @@
     "region": "ME",
     "status": "registered",
     "open_id": "5b492ac52f22bd3ee949052b727d45fa",
-    "access_token": "e0bc39a32f11ad3bc1ddff6eb57c4468af88a692109b5255e7806cbcfb21b4d7"
+    "access_token": "ac404f7d8193718f42e9d8d2e4ae15abbb06d1f60ae1c53ed214bc630134acfd"
+  },
+  {
+    "uid": "4067187731",
+    "password": "D9EA225CABFF4D2CDF3371300596E705C94677A17A3C5001AD01FFE2D4F5BAD4",
+    "name": "BOT187731",
+    "region": "ME",
+    "status": "registered",
+    "open_id": "e11fa208a3a47ae27c1eed3eed428ac3",
+    "access_token": "722d409ed1c8ea42170b298b7e16646247e501939d3abd2d628994ba5d325276"
   }
 ]
