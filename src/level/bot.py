@@ -113,6 +113,17 @@ class LevelBot:
         # ── Step 2: MajorLogin ──
         login_result = await self.auth.major_login(access_token, open_id)
         if not login_result or (isinstance(login_result, dict) and login_result.get("error")):
+            # Check if the response was a tiny 200 (banned/rejected, not a server error)
+            if login_result and isinstance(login_result, dict) and not login_result.get("error"):
+                pass  # Has result but no token — handled below
+            elif not login_result:
+                self.stats.state = "banned"
+                logger.error("MajorLogin: server returned 200 but no JWT token — account likely BANNED")
+                print(f"\n  [!] MajorLogin: Server accepted request but returned no token.")
+                print(f"      This usually means the guest account is BANNED or suspended.")
+                print(f"      Try a different guest account.\n")
+                await self.http.aclose()
+                return self.stats
             last_status = login_result.get("last_status", 0) if isinstance(login_result, dict) else 0
             if last_status == 503:
                 self.stats.state = "server_down"

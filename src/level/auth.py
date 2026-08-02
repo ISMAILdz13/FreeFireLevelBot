@@ -176,7 +176,27 @@ class LevelAuth:
                         return result
                     logger.warning(f"MajorLogin: 200 OK but parse failed (body_len={len(resp.content)})")
                 elif resp.status_code == 200 and len(resp.content) <= 30:
-                    logger.warning(f"MajorLogin: 200 OK but tiny response ({len(resp.content)} bytes) — likely rejected")
+                    body_hex = resp.content.hex()
+                    logger.warning(f"MajorLogin: 200 OK but tiny response ({len(resp.content)} bytes)")
+                    logger.warning(f"  Raw hex: {body_hex}")
+                    # Try to decode as protobuf
+                    try:
+                        from .Pb2.MajoRLoGinrEs_pb2 import MajorLoginRes
+                        msg = MajorLoginRes()
+                        msg.ParseFromString(resp.content)
+                        logger.warning(f"  Parsed: token={bool(msg.token)}, uid={msg.account_uid}, region={msg.region}")
+                        if not msg.token:
+                            logger.warning(f"  >>> BANNED or REJECTED — server returned no JWT token")
+                    except Exception as pe:
+                        logger.warning(f"  Parse error: {pe}")
+                    # Try raw protobuf decode
+                    try:
+                        from protobuf_decoder.protobuf_decoder import Parser
+                        parsed = Parser().parse(body_hex)
+                        for r in parsed:
+                            logger.warning(f"  field {r.field} ({r.wire_type}): {r.data}")
+                    except Exception:
+                        pass
                 else:
                     logger.warning(f"MajorLogin attempt {attempt+1}: status={resp.status_code}, body_len={len(resp.content)}")
             except Exception as e:
