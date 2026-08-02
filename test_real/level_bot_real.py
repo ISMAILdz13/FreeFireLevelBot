@@ -514,6 +514,44 @@ async def keepalive_packet(key, iv, channel="online"):
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), pkt_type, key, iv)
 
 
+
+
+async def join_match_packet(group_id, key, iv, region="ME"):
+    """Join match room — field 1=3, packet type 0e15 (online channel).
+    Based on ClanGloryBot join_match."""
+    fields = {
+        1: 3,
+        2: {
+            1: int(group_id),
+            2: "",
+            8: {1: "IDC3", 2: 149, 3: region},
+            9: b"\x01\x03\x04\x07\x09\x0a\x0b\x12\x0e\x16\x19\x20\x1d",
+            10: 1,
+            12: {},
+            13: 1,
+            14: 1,
+            16: "en",
+            22: {1: 21},
+        }
+    }
+    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), '0e15', key, iv)
+
+
+async def join_match_chat_packet(group_id, key, iv):
+    """Join match on chat channel — field 1=3, packet type 1215."""
+    fields = {
+        1: 3,
+        2: {
+            1: int(group_id),
+            2: 3,
+            3: "en",
+        }
+    }
+    chat_proto = await CrEaTe_ProTo(fields)
+    chat_hex = chat_proto.hex() + "7200"
+    return await GeneRaTePk(chat_hex, '1215', key, iv)
+
+
 # ═══════════════════════════════════════════════════════════════
 #  auto_start_loop — SOLO MODE (ClanGloryBot solo_cycle 1:1)
 # ═══════════════════════════════════════════════════════════════
@@ -617,8 +655,14 @@ async def auto_start_loop(team_code, online_writer, chat_writer, key, iv,
 #  Packet reader (background)
 # ═══════════════════════════════════════════════════════════════
 
-async def read_online(reader, key, iv):
-    """Background reader — logs incoming packets."""
+async def read_online(reader, key, iv, online_writer=None, chat_writer=None, account_uid=None):
+    """Background reader — detects match-found (f2=18) and joins the match."""
+    from protobuf_decoder.protobuf_decoder import Parser
+    import json as _json
+
+    match_found = False
+    group_id = None
+
     while True:
         try:
             data = await asyncio.wait_for(reader.read(65535), timeout=30.0)
@@ -627,6 +671,131 @@ async def read_online(reader, key, iv):
             hex_data = data.hex()
             if len(hex_data) > 20:
                 print(f"  📥 RX: {len(data)}B header={hex_data[:12]}")
+
+            # Try different offsets to find f2=18 (match found)
+            for skip in [10, 8, 12, 6, 4, 0, 14, 16, 18, 20, 2, 22, 24]:
+                try:
+                    payload = hex_data[skip:]
+                    if len(payload) < 20:
+                        continue
+
+                    # Try raw parse first (like ClanGloryBot solo_cycle)
+                    try:
+                        parsed = Parser().parse(payload)
+                        parsed_dict = {}
+                        for r in parsed:
+                            if r.wire_type == 'varint':
+                                parsed_dict[r.field] = {'data': r.data, 'wire_type': 'varint'}
+                            elif r.wire_type == 'length_delimited':
+                                parsed_dict[r.field] = {'data': r.data, 'wire_type': 'length_delimited'}
+
+                        # Check for f2=18 (match found)
+                        f2 = parsed_dict.get(2, {})
+                        f2_val = f2.get('data') if isinstance(f2, dict) else f2
+                        if isinstance(f2_val, int) and f2_val == 18 and not match_found:
+                            # Extract GroupID from f5.1
+                            f5 = parsed_dict.get(5, {})
+                            f5_data = f5.get('data', '') if isinstance(f5, dict) else ''
+                            # f5 data might be nested - try to find group_id
+                            gid = None
+                            if isinstance(f5_data, str):
+                                import re as _re
+                                # Look for large number (group_id > 1 billion)
+                                nums = _re.findall(r'(\d{10,})', f5_data)
+                                if nums:
+                                    gid = int(nums[0])
+                            if isinstance(f5_data, int) and f5_data > 1000000000:
+                                gid = f5_data
+
+                            if gid and gid > 1000000000:
+                                match_found = True
+                                group_id = gid
+                                print(f"\n  🎯 MATCH FOUND! f2=18, GroupID={group_id}")
+                                print(f"  🎯 Joining match room...")
+
+                                # Join match on online channel (0e15)
+                                if online_writer:
+                                    join_pkt = await join_match_packet(group_id, key, iv)
+                                    online_writer.write(join_pkt)
+                                    await online_writer.drain()
+                                    print(f"  ✅ Match join sent (0e15)")
+
+                                # Join match on chat channel (1215)
+                                if chat_writer:
+                                    await asyncio.sleep(0.5)
+                                    chat_join_pkt = await join_match_chat_packet(group_id, key, iv)
+                                    chat_writer.write(chat_join_pkt)
+                                    await chat_writer.drain()
+                                    print(f"  ✅ Chat join sent (1215)")
+
+                                # Look for RecruitCode in f5.8
+                                f8 = None
+                                f5_full = parsed_dict.get(5, {})
+                                if isinstance(f5_full, dict):
+                                    f8_raw = str(f5_full.get('data', ''))
+                                    import re as _re2
+                                    rc_match = _re2.search(r'RecruitCode["\']?:?["\']?([^"\',}]+)', f8_raw)
+                                    if rc_match:
+                                        rc = rc_match.group(1)
+                                        print(f"  🎯 RecruitCode: {rc[:40]}...")
+                                        if online_writer:
+                                            await asyncio.sleep(0.5)
+                                            rc_pkt = await join_teamcode_packet(rc, key, iv)
+                                            online_writer.write(rc_pkt)
+                                            await online_writer.drain()
+                                            print(f"  ✅ Match room join sent (RecruitCode)")
+
+                                break  # Found match, stop trying offsets
+                    except Exception:
+                        pass
+
+                    # Try decryption (server may encrypt some packets)
+                    try:
+                        decrypted = await DEc_PacKeT(payload, key, iv)
+                        if decrypted and len(decrypted) > 10:
+                            parsed = Parser().parse(decrypted)
+                            parsed_dict = {}
+                            for r in parsed:
+                                if r.wire_type == 'varint':
+                                    parsed_dict[r.field] = {'data': r.data, 'wire_type': 'varint'}
+                                elif r.wire_type == 'length_delimited':
+                                    parsed_dict[r.field] = {'data': r.data, 'wire_type': 'length_delimited'}
+
+                            f2 = parsed_dict.get(2, {})
+                            f2_val = f2.get('data') if isinstance(f2, dict) else f2
+                            if isinstance(f2_val, int) and f2_val == 18 and not match_found:
+                                f5 = parsed_dict.get(5, {})
+                                f5_data = f5.get('data', '') if isinstance(f5, dict) else ''
+                                gid = None
+                                if isinstance(f5_data, str):
+                                    import re as _re
+                                    nums = _re.findall(r'(\d{10,})', f5_data)
+                                    if nums:
+                                        gid = int(nums[0])
+                                if isinstance(f5_data, int) and f5_data > 1000000000:
+                                    gid = f5_data
+
+                                if gid and gid > 1000000000:
+                                    match_found = True
+                                    group_id = gid
+                                    print(f"\n  🎯 MATCH FOUND (decrypted)! f2=18, GroupID={group_id}")
+                                    if online_writer:
+                                        join_pkt = await join_match_packet(group_id, key, iv)
+                                        online_writer.write(join_pkt)
+                                        await online_writer.drain()
+                                        print(f"  ✅ Match join sent (0e15)")
+                                    if chat_writer:
+                                        await asyncio.sleep(0.5)
+                                        chat_join_pkt = await join_match_chat_packet(group_id, key, iv)
+                                        chat_writer.write(chat_join_pkt)
+                                        await chat_writer.drain()
+                                        print(f"  ✅ Chat join sent (1215)")
+                                    break
+                    except Exception:
+                        pass
+
+                except Exception:
+                    continue
         except asyncio.TimeoutError:
             continue
         except Exception:
@@ -831,8 +1000,8 @@ async def main():
 
     # ── Start loop + readers ──
     print("\n🚀 Starting level bot...\n")
-    online_reader_task = asyncio.create_task(read_online(online_reader, key, iv))
-    chat_reader_task = asyncio.create_task(read_online(chat_reader, key, iv))
+    online_reader_task = asyncio.create_task(read_online(online_reader, key, iv, online_writer, chat_writer, account_uid))
+    chat_reader_task = asyncio.create_task(read_online(chat_reader, key, iv, online_writer, chat_writer, account_uid))
     loop_task = asyncio.create_task(
         auto_start_loop(team_code, online_writer, chat_writer, key, iv, account_uid=account_uid)
     )
