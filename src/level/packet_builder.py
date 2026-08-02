@@ -237,6 +237,29 @@ class PacketBuilder:
         }
         return self.build_packet(fields, "1215")
 
+
+    # ── Join match room (0e15 packet — same as ClanGloryBot) ──
+
+    def join_match_room(self, group_id: int) -> bytes:
+        """Join match room using GroupID (field 1=3, type 0e15).
+        Same as ClanGloryBot's join_match."""
+        fields = {
+            1: 3,
+            2: {
+                1: group_id,
+                2: "",
+                8: {1: "IDC3", 2: 149, 3: self.region.upper()},
+                9: b"\x01\x03\x04\x07\x09\x0a\x0b\x12\x0e\x16\x19\x20\x1d",
+                10: 1,
+                12: {},
+                13: 1,
+                14: 1,
+                16: "en",
+                22: {1: 21},
+            },
+        }
+        return self.build_packet(fields, "0e15")
+
     # ── Legacy compatibility (deprecated — use join_squad) ──
 
     def join_team(self, team_code: str, uid: int = 0) -> bytes:
