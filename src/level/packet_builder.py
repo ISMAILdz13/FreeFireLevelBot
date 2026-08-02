@@ -1,30 +1,25 @@
 """
-Packet Builder — rewritten to use xC4 GeneRaTePk framing.
-Fixes: 6-byte header (not 7), proper start-match (269+214+9), full join fields.
+Packet Builder — uses xC4 GeneRaTePk framing (1:1 with ClanGloryBot).
+Fixed: GenJoinSquadsPacket format, full field-269 device info, version 1.126.2.
 """
 
 import asyncio
+import time
 from typing import Dict, Any, Optional
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
+# Current Free Fire version (matches ClanGloryBot)
+CLIENT_VERSION = "1.126.2"
+
 
 class PacketBuilder:
-    """
-    Builds encrypted protobuf packets using xC4 GeneRaTePk framing.
-
-    Usage:
-        pb = PacketBuilder(key, iv)
-        packet = pb.join_team("1785611837")
-        socket.send(packet)
-    """
+    """Builds encrypted protobuf packets using xC4 GeneRaTePk framing."""
 
     def __init__(self, key: bytes, iv: bytes, region: str = "ME"):
         self.key = key if isinstance(key, bytes) else bytes.fromhex(key)
         self.iv = iv if isinstance(iv, bytes) else bytes.fromhex(iv)
         self.region = region.lower()
-
-    # ── xC4 packet type by region ──────────────────────────
 
     def _pkt_type(self) -> str:
         if self.region == "ind":
@@ -33,20 +28,15 @@ class PacketBuilder:
             return "0519"
         return "0515"
 
-    # ── Encryption (same as xC4 EnC_PacKeT) ──────────────────
-
     def _encrypt(self, hex_data: str) -> str:
-        """AES-CBC encrypt hex string, return hex ciphertext (same as xC4 EnC_PacKeT)."""
         plain = bytes.fromhex(hex_data)
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
         return cipher.encrypt(pad(plain, AES.block_size)).hex()
 
-    # ── Varint encoding (same as xC4 EnC_Vr) ────────────────
-
     @staticmethod
     def _encode_varint(n: int) -> bytes:
         if n < 0:
-            raise ValueError("Number must be non-negative")
+            return b""
         buf = []
         while True:
             byte = n & 0x7F
@@ -60,10 +50,7 @@ class PacketBuilder:
 
     @staticmethod
     def _dec_to_hex(n: int) -> str:
-        h = hex(n)[2:]
-        return h
-
-    # ── Protobuf field builders (same as xC4 CrEaTe_ProTo) ──
+        return hex(n)[2:]
 
     @classmethod
     def _varint_field(cls, field_number: int, value: int) -> bytes:
@@ -89,22 +76,14 @@ class PacketBuilder:
                 packet.extend(cls._length_delimited_field(field, value))
         return bytes(packet)
 
-    # ── GeneRaTePk — correct 6-byte header framing ──────────
-
     def _generate_packet(self, proto_hex: str, pkt_type: str) -> bytes:
-        """
-        Build packet with xC4 GeneRaTePk framing:
-          [pkt_type(4)][zeros(6-len)][length_hex][encrypted_data]
-
-        Total header = 4 + 8 = 12 hex chars = 6 bytes (CORRECT).
-        Old PacketBuilder used 4 + 10 = 14 hex = 7 bytes (WRONG).
-        """
+        """GeneRaTePk framing: [pkt_type(4)][zeros][length_hex][encrypted_data] — 6-byte header."""
         encrypted = self._encrypt(proto_hex)
         length_hex = self._dec_to_hex(len(encrypted) // 2)
 
-        # Pad zeros so header = pkt_type(4) + zeros + length = 12 hex total
-        # len == 2 → 6 zeros, len == 3 → 5 zeros, len == 4 → 4 zeros, len == 5 → 3 zeros
-        if len(length_hex) == 2:
+        if len(length_hex) == 1:
+            header = pkt_type + "0000000" + length_hex
+        elif len(length_hex) == 2:
             header = pkt_type + "000000" + length_hex
         elif len(length_hex) == 3:
             header = pkt_type + "00000" + length_hex
@@ -112,110 +91,136 @@ class PacketBuilder:
             header = pkt_type + "0000" + length_hex
         elif len(length_hex) == 5:
             header = pkt_type + "000" + length_hex
+        elif len(length_hex) == 6:
+            header = pkt_type + "00" + length_hex
+        elif len(length_hex) == 7:
+            header = pkt_type + "0" + length_hex
         else:
-            header = pkt_type + length_hex.rjust(8, "0")
+            header = pkt_type + length_hex
 
         return bytes.fromhex(header + encrypted)
 
     def build_packet(self, fields: Dict[int, Any], pkt_type: str = None) -> bytes:
-        """Build a complete encrypted packet with correct framing."""
         proto_hex = self._build_protobuf(fields).hex()
         return self._generate_packet(proto_hex, pkt_type or self._pkt_type())
 
-    # ── Game-specific packets ────────────────────────────────
+    # ── Join squad (GenJoinSquadsPacket — EXACT match to ClanGloryBot) ──
 
-    def join_team(self, team_code: str, uid: int = 0) -> bytes:
+    def join_squad(self, squad_code: str) -> bytes:
         """
-        Build join-squad packet — full fields matching xC4 redzed.
-        Uses string code (field 2.10) + owner UID + device/version info.
+        GenJoinSquadsPacket — join squad using full squad_code string.
+        EXACT match to ClanGloryBot's GenJoinSquadsPacket.
         """
-        owner_uid = uid if uid else 1
         fields = {
             1: 4,
             2: {
-                1: owner_uid,
-                3: owner_uid,
+                4: bytes.fromhex("01090a0b121920"),
+                5: str(squad_code),
+                6: 6,
                 8: 1,
                 9: {
-                    2: 161,
-                    4: "y[WW",
+                    2: 800,
                     6: 11,
-                    8: "1.114.18",
-                    9: 3,
+                    8: CLIENT_VERSION,
+                    9: 5,
                     10: 1,
                 },
-                10: str(team_code),
             },
         }
         return self.build_packet(fields)
 
-    def start_match_detailed(self, uid: int) -> bytes:
-        """
-        Build field 269 (detailed start-match) — includes device info.
-        This is the PRIMARY match trigger in ClanGloryBot.
-        """
+    def open_squad(self) -> bytes:
+        """OpEnSq — leader opens squad for matchmaking (EXACT match to ClanGloryBot)."""
         fields = {
-            1: 269,
+            1: 1,
             2: {
-                1: uid,
-                9: {
-                    2: 800,
+                2: "\u0001",
+                3: 1,
+                4: 1,
+                5: "en",
+                9: 1,
+                11: 1,
+                13: 1,
+                14: {
+                    2: 5756,
                     6: 11,
-                    8: "1.111.5",
-                    9: 5,
+                    8: CLIENT_VERSION,
+                    9: 2,
                     10: 4,
                 },
             },
         }
         return self.build_packet(fields)
 
-    def start_match_simple(self) -> bytes:
+    # ── Start match (EXACT match to ClanGloryBot) ──
+
+    def start_match_detailed(self, uid: int) -> bytes:
         """
-        Build field 214 (simple start-match) — backup trigger.
+        Field 269 — detailed start-match with FULL device info.
+        EXACT match to ClanGloryBot's start_match_leader.
         """
         fields = {
-            1: 214,
+            1: 269,
             2: {
-                1: 1,
+                1: 8,
+                2: 8,
+                3: 11,
+                4: 1,
+                5: "samsung",
+                6: "SM-A145F",
+                7: "arm64-v8a",
+                8: "f538dc9b-cec9-43cd-8125-95f7f4f1f7e3",
+                9: "FFD58FB4F76F648C2A5E21EBCFA3AAE81B4C9B7D97",
+                10: "voice",
+                11: "V2059",
+                12: "mt6785",
+                13: "AFFD58FB4F76F648C2A5E21EBCFA3AAE81B4C9B7D97",
+                14: f"{self.region.upper()}_1999120752610979840",
+                15: 269,
             },
         }
+        return self.build_packet(fields)
+
+    def start_match_simple(self) -> bytes:
+        """Field 214 — simple start-match (EXACT match to ClanGloryBot)."""
+        fields = {1: 214, 2: {1: 1}}
         return self.build_packet(fields)
 
     def start_match_ready(self, uid: int) -> bytes:
-        """
-        Build field 9 (ready signal) — tells server "I'm ready".
-        Must be sent AFTER 269 and 214, not instead of them.
-        """
-        fields = {
-            1: 9,
-            2: {
-                1: uid,
-            },
-        }
+        """Field 9 — ready signal (EXACT match to ClanGloryBot)."""
+        fields = {1: 9, 2: {1: uid}}
         return self.build_packet(fields)
 
-    def leave_team(self, uid: int = 0) -> bytes:
-        """Build leave-squad packet — field 1=7."""
-        owner_uid = uid if uid else 1
-        fields = {
-            1: 7,
-            2: {
-                1: owner_uid,
-            },
-        }
+    # ── Leave squad ──
+
+    def leave_squad(self, uid: int = 0) -> bytes:
+        """ExiT — leave squad (field 1=7). ClanGloryBot sends on ONLINE channel."""
+        fields = {1: 7, 2: {1: uid if uid else 1}}
         return self.build_packet(fields)
+
+    # ── Keepalive (field 99) ──
+
+    def keepalive(self) -> bytes:
+        """Field 99 keepalive with timestamp (EXACT match to ClanGloryBot)."""
+        fields = {1: 99, 2: {1: int(time.time()), 2: 1}}
+        return self.build_packet(fields)
+
+    def keepalive_chat(self) -> bytes:
+        """Field 99 keepalive for chat channel (uses 1215 packet type)."""
+        fields = {1: 99, 2: {1: int(time.time()), 2: 1}}
+        return self.build_packet(fields, "1215")
+
+    # ── Chat message ──
 
     def chat_message(self, text: str, sender_uid: int) -> bytes:
-        """Build in-game chat message packet."""
-        from datetime import datetime
+        """In-game chat message (uses 1215 packet type)."""
         fields = {
             1: 1,
             2: {
-                1: 12947146032,
+                1: sender_uid,
                 2: sender_uid,
-                3: 2,
                 4: str(text),
-                5: int(datetime.now().timestamp()),
+                5: int(time.time()),
                 7: 2,
                 9: {
                     1: "LevelBot",
@@ -227,7 +232,17 @@ class PacketBuilder:
                     10: 1,
                     11: 1,
                 },
-                10: "ME",
+                10: "en",
             },
         }
         return self.build_packet(fields, "1215")
+
+    # ── Legacy compatibility (deprecated — use join_squad) ──
+
+    def join_team(self, team_code: str, uid: int = 0) -> bytes:
+        """DEPRECATED: use join_squad() instead. Kept for backward compat."""
+        return self.join_squad(team_code)
+
+    def leave_team(self, uid: int = 0) -> bytes:
+        """DEPRECATED: use leave_squad() instead. Kept for backward compat."""
+        return self.leave_squad(uid)

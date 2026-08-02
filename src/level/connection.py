@@ -1,6 +1,7 @@
 """
-Game Connection — rewritten to match the working ClanGloryBot approach.
-Uses asyncio.open_connection, SO_KEEPALIVE, and application-level keepalive.
+Game Connection — 1:1 with ClanGloryBot approach.
+Uses asyncio.open_connection, SO_KEEPALIVE, field-99 keepalive with timestamp.
+Sends join/start/leave on ONLINE channel only (chat kills connections).
 """
 
 import asyncio
@@ -11,9 +12,13 @@ from typing import Optional, Callable, Any
 
 logger = logging.getLogger("levelbot.connection")
 
+# Region → packet type (same as ClanGloryBot)
+REGION_PACKETS = {"ind": "0514", "bd": "0519"}
+DEFAULT_PACKET = "0515"
+
 
 class GameConnection:
-    """Async TCP connection manager using asyncio streams (like ClanGloryBot)."""
+    """Async TCP connection manager — matches ClanGloryBot."""
 
     def __init__(self, recv_timeout: float = 1.0):
         self.online_reader: Optional[asyncio.StreamReader] = None
@@ -32,12 +37,12 @@ class GameConnection:
         self._on_whisper_data: Optional[Callable] = None
         self._key: bytes = b""
         self._iv: bytes = b""
-        self._region: str = "IND"
+        self._region: str = "ME"
 
-    def set_crypto(self, key: bytes, iv: bytes, region: str = "IND"):
+    def set_crypto(self, key: bytes, iv: bytes, region: str = "ME"):
         self._key = key
         self._iv = iv
-        self._region = region
+        self._region = region.lower()
 
     def on_whisper_data(self, callback: Callable[[bytes], Any]):
         self._on_whisper_data = callback
@@ -50,7 +55,7 @@ class GameConnection:
         online_port: int,
         token_hex: str,
     ):
-        """Connect to both servers using asyncio streams + send auth token."""
+        """Connect to both servers, send auth token, start keepalive."""
         self.whisper_ip = whisper_ip
         self.whisper_port = int(whisper_port)
         self.online_ip = online_ip
@@ -58,14 +63,12 @@ class GameConnection:
 
         auth_bytes = bytes.fromhex(token_hex)
 
-        # Connect online socket
-        logger.info(f"Connecting to online server {online_ip}:{online_port}...")
+        logger.info(f"Connecting to online {online_ip}:{online_port}...")
         self.online_reader, self.online_writer = await asyncio.open_connection(
             self.online_ip, self.online_port
         )
 
-        # Connect whisper (chat) socket
-        logger.info(f"Connecting to whisper server {whisper_ip}:{whisper_port}...")
+        logger.info(f"Connecting to chat {whisper_ip}:{whisper_port}...")
         self.whisper_reader, self.whisper_writer = await asyncio.open_connection(
             self.whisper_ip, self.whisper_port
         )
@@ -86,24 +89,19 @@ class GameConnection:
         self.whisper_writer.write(auth_bytes)
         await self.whisper_writer.drain()
 
-        logger.info("TCP connected + auth token sent on both channels")
+        logger.info("TCP connected + auth token sent")
 
-        # Send AutH_GlobAl packet on chat channel (required by Garena)
+        # Send AutH_GlobAl on chat channel (required by Garena)
         await asyncio.sleep(1)
         await self._send_global_auth()
 
         self.connected = True
         self._last_data_time = time.time()
-
-        # Start keepalive loop
         self._ka_stop = asyncio.Event()
         self._ka_task = asyncio.create_task(self._keepalive_loop())
 
     async def _send_global_auth(self):
-        """Send AutH_GlobAl packet on chat channel (same as ClanGloryBot)."""
-        if not self._key or not self._iv:
-            logger.warning("No crypto keys set — skipping global auth")
-            return
+        """Send AutH_GlobAl on chat channel (same as ClanGloryBot)."""
         try:
             from .xC4 import AutH_GlobAl
             packet = await AutH_GlobAl(self._key, self._iv)
@@ -114,19 +112,29 @@ class GameConnection:
             logger.warning(f"AutH_GlobAl failed: {e}")
 
     async def _keepalive_loop(self):
-        """Send field-99 keepalive every 15s on both channels (same as ClanGloryBot)."""
+        """Send field-99 keepalive every 15s on BOTH channels (same as ClanGloryBot).
+        Includes timestamp {1: time.time(), 2: 1} — not just {1: 99}."""
         from .xC4 import CrEaTe_ProTo, GeneRaTePk
         while not self._ka_stop.is_set():
             try:
-                proto = await CrEaTe_ProTo({1: 99})
-                pkt_type = "0515"
-                packet = await GeneRaTePk(proto.hex(), pkt_type, self._key, self._iv)
+                proto = await CrEaTe_ProTo({1: 99, 2: {1: int(time.time()), 2: 1}})
+                # Online channel: region-specific packet type
+                pkt_type = REGION_PACKETS.get(self._region, DEFAULT_PACKET)
+                pkt_online = await GeneRaTePk(proto.hex(), pkt_type, self._key, self._iv)
                 if self.online_writer and not self.online_writer.is_closing():
-                    self.online_writer.write(packet)
+                    self.online_writer.write(pkt_online)
                     await self.online_writer.drain()
+                # Chat channel: 1215 packet type
+                pkt_chat = await GeneRaTePk(proto.hex(), "1215", self._key, self._iv)
                 if self.whisper_writer and not self.whisper_writer.is_closing():
-                    self.whisper_writer.write(packet)
+                    self.whisper_writer.write(pkt_chat)
                     await self.whisper_writer.drain()
+
+                # Watchdog: 300s no data = dead
+                if time.time() - self._last_data_time > 300:
+                    logger.warning("Watchdog: no data for 300s, marking disconnected")
+                    self.connected = False
+                    break
             except Exception as e:
                 if not self._ka_stop.is_set():
                     logger.warning(f"Keepalive error: {e}")
@@ -134,23 +142,39 @@ class GameConnection:
                     break
             await asyncio.sleep(15)
 
-    async def send_whisper(self, data: bytes):
-        """Send raw bytes on the whisper (chat) socket."""
-        if not self.whisper_writer or self.whisper_writer.is_closing():
-            raise ConnectionError("Whisper socket not connected")
-        self.whisper_writer.write(data)
-        await self.whisper_writer.drain()
-
-    async def send_online(self, data: bytes):
-        """Send raw bytes on the online socket."""
-        if not self.online_writer or self.online_writer.is_closing():
-            raise ConnectionError("Online socket not connected")
-        self.online_writer.write(data)
-        await self.online_writer.drain()
+    def reset_ka_watchdog(self):
+        """Call when any data is received from server."""
         self._last_data_time = time.time()
 
+    async def send_whisper(self, data: bytes) -> bool:
+        """Send raw bytes on chat/whisper socket. Returns True on success."""
+        if not self.whisper_writer or self.whisper_writer.is_closing():
+            logger.warning("Whisper socket not connected")
+            return False
+        try:
+            self.whisper_writer.write(data)
+            await self.whisper_writer.drain()
+            return True
+        except (ConnectionResetError, BrokenPipeError, OSError) as e:
+            logger.warning(f"Whisper send error: {e}")
+            self.connected = False
+            return False
+
+    async def send_online(self, data: bytes) -> bool:
+        """Send raw bytes on online socket. Returns True on success."""
+        if not self.online_writer or self.online_writer.is_closing():
+            logger.warning("Online socket not connected")
+            return False
+        try:
+            self.online_writer.write(data)
+            await self.online_writer.drain()
+            return True
+        except (ConnectionResetError, BrokenPipeError, OSError) as e:
+            logger.warning(f"Online send error: {e}")
+            self.connected = False
+            return False
+
     async def recv_whisper(self, timeout: float = 5.0) -> Optional[bytes]:
-        """Receive data from whisper socket with timeout."""
         if not self.whisper_reader:
             return None
         try:
@@ -166,7 +190,6 @@ class GameConnection:
             return None
 
     async def recv_online(self, timeout: float = 5.0) -> Optional[bytes]:
-        """Receive data from online socket with timeout."""
         if not self.online_reader:
             return None
         try:
@@ -181,21 +204,7 @@ class GameConnection:
             self.connected = False
             return None
 
-    async def whisper_listen_loop(self, callback: Callable[[bytes], Any]):
-        """Continuously read from whisper socket and call callback with data."""
-        while not self._ka_stop or not self._ka_stop.is_set():
-            data = await self.recv_whisper(timeout=2.0)
-            if data is None:
-                if not self.connected:
-                    break
-                continue
-            try:
-                callback(data)
-            except Exception as e:
-                logger.warning(f"Whisper callback error: {e}")
-
     async def close(self):
-        """Close all sockets and stop background tasks."""
         logger.info("Closing game connection...")
         if self._ka_stop:
             self._ka_stop.set()
@@ -208,13 +217,11 @@ class GameConnection:
             self._ka_task = None
 
         self.connected = False
-
         for name, writer in [("whisper", self.whisper_writer), ("online", self.online_writer)]:
             if writer and not writer.is_closing():
                 try:
                     writer.close()
                     await writer.wait_closed()
-                    logger.info(f"{name} socket closed")
                 except Exception:
                     pass
 

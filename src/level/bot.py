@@ -185,7 +185,7 @@ class LevelBot:
         self.pb = PacketBuilder(key, iv, region=region)
 
         # Set crypto keys on connection (for keepalive + global auth)
-        self.connection.set_crypto(key, iv)
+        self.connection.set_crypto(key, iv, region=region)
 
         try:
             await self.connection.connect(

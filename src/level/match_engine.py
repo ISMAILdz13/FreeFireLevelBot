@@ -1,15 +1,14 @@
 """
-Match Engine
-Core level-up loop: join team → start match → wait → leave → repeat.
-
-Adapted from level/app.py auto_start_loop() — made async, config-driven,
-with stats tracking, progress callbacks, and clean stop.
+Match Engine — 1:1 with ClanGloryBot flow.
+Opens own squad (OpEnSq) → gets squad_code → joins with GenJoinSquadsPacket.
+Sends all match commands on ONLINE channel only (chat kills connections).
 """
 
 import asyncio
 import time
 import logging
-from dataclasses import dataclass, field
+import random
+from dataclasses import dataclass
 from typing import Optional, Callable, Any
 
 from .packet_builder import PacketBuilder
@@ -20,7 +19,6 @@ logger = logging.getLogger("levelbot.engine")
 
 @dataclass
 class MatchStats:
-    """Runtime stats for the level bot."""
     cycles_completed: int = 0
     matches_started: int = 0
     join_attempts: int = 0
@@ -28,24 +26,20 @@ class MatchStats:
     leave_attempts: int = 0
     leave_failures: int = 0
     uptime_seconds: float = 0.0
-    current_state: str = "idle"  # idle, joining, matching, waiting, leaving
+    current_state: str = "idle"
     last_error: str = ""
 
 
 class MatchEngine:
     """
-    Orchestrates the auto level-up loop.
-
-    Each cycle:
-        1. Join squad with team_code
-        2. Spam start-match packets for spam_duration seconds
-        3. Wait wait_after_match seconds for match to complete
-        4. Leave squad
-        5. Repeat
-
-    Usage:
-        engine = MatchEngine(conn, packet_builder, config)
-        await engine.start(team_code="123456", max_cycles=100)
+    Auto level-up loop matching ClanGloryBot:
+    1. Open squad (OpEnSq) on ONLINE → parse squad_code from response
+    2. Join squad (GenJoinSquadsPacket) on ONLINE
+    3. Send 269 + 214 + 9 (start match) on ONLINE only
+    4. Spam field 9 ready signal on ONLINE
+    5. Wait for match (read both channels)
+    6. Leave squad on ONLINE
+    7. Repeat
     """
 
     def __init__(
@@ -74,48 +68,18 @@ class MatchEngine:
         self._running = False
         self._stop_requested = False
         self._on_progress: Optional[Callable[[MatchStats], Any]] = None
-        self._on_message: Optional[Callable[[str], Any]] = None
-        self._sender_uid: int = 0
 
     def on_progress(self, callback: Callable[[MatchStats], Any]):
-        """Register callback for progress updates (called after each cycle)."""
         self._on_progress = callback
 
-    def on_message(self, callback: Callable[[str], Any]):
-        """Register callback for chat messages to send in-game."""
-        self._on_message = callback
-
-    def set_sender_uid(self, uid: int):
-        """Set the UID used for in-game chat messages."""
-        self._sender_uid = uid
-
-    @property
-    def is_running(self) -> bool:
-        return self._running
-
     def stop(self):
-        """Request the engine to stop after the current cycle."""
         self._stop_requested = True
-        logger.info("Stop requested — will finish current cycle then halt")
 
     async def start(self, team_code: str, max_cycles: int = 1000) -> MatchStats:
-        """
-        Start the auto level-up loop.
-
-        Args:
-            team_code: The squad/team code to join (digits only)
-            max_cycles: Safety limit on number of cycles
-
-        Returns:
-            Final MatchStats
-        """
-        if not team_code.isdigit():
-            raise ValueError(f"Team code must be numeric, got: {team_code}")
-
         self._running = True
         self._stop_requested = False
         start_time = time.time()
-        logger.info(f"🚀 Starting level-up loop: team={team_code}, max_cycles={max_cycles}")
+        logger.info(f"Starting level-up loop: team={team_code}, max_cycles={max_cycles}")
 
         while not self._stop_requested and self.stats.cycles_completed < max_cycles:
             try:
@@ -123,104 +87,181 @@ class MatchEngine:
             except Exception as e:
                 logger.error(f"Error in cycle #{self.stats.cycles_completed + 1}: {e}")
                 self.stats.last_error = str(e)
-                # Brief recovery pause
                 await asyncio.sleep(3)
 
         self._running = False
         self.stats.uptime_seconds = time.time() - start_time
         self.stats.current_state = "stopped"
-        logger.info(
-            f"🛑 Level-up loop ended: {self.stats.cycles_completed} cycles, "
-            f"{self.stats.matches_started} matches, "
-            f"{self.stats.uptime_seconds:.0f}s uptime"
-        )
         return self.stats
 
     async def _run_cycle(self, team_code: str):
-        """Run a single join → start → wait → leave cycle."""
         cycle_num = self.stats.cycles_completed + 1
-        logger.info(f"🔄 Cycle #{cycle_num}")
+        logger.info(f"Cycle #{cycle_num}")
 
-        # ── Step 1: Join team ──
+        # ── Step 1: Leave any existing squad first ──
+        leave_pkt = self.pb.leave_squad(self.uid)
+        await self.conn.send_online(leave_pkt)
+        await asyncio.sleep(1)
+
+        # ── Step 2: Open squad (OpEnSq) on ONLINE ──
+        self.stats.current_state = "opening_squad"
+        open_pkt = self.pb.open_squad()
+        await self.conn.send_online(open_pkt)
+        logger.info("Sent OpEnSq on ONLINE channel")
+
+        # Read response to get squad_code
+        squad_code = None
+        for attempt in range(3):
+            data = await self.conn.recv_online(timeout=3.0)
+            if data:
+                self.conn.reset_ka_watchdog()
+                squad_code = self._parse_squad_code(data)
+                if squad_code:
+                    logger.info(f"Got squad_code from OpEnSq: {squad_code[:20]}...")
+                    break
+                logger.info(f"Online data: {len(data)} bytes (no squad code found)")
+
+        if not squad_code:
+            # Fallback: use the provided team_code as squad_code directly
+            logger.info(f"No squad_code from OpEnSq — using provided code: {team_code}")
+            squad_code = team_code
+
+        if self._stop_requested:
+            return
+
+        # ── Step 3: Join squad (GenJoinSquadsPacket) on ONLINE ──
         self.stats.current_state = "joining"
         self.stats.join_attempts += 1
-        join_packet = self.pb.join_team(team_code, self.uid)
-        await self.conn.send_whisper(join_packet)
-        # Also send on online channel (server may expect it there)
-        await self.conn.send_online(join_packet)
-        await asyncio.sleep(self.join_delay)
-        logger.info(f"Joined team {team_code}")
 
+        join_pkt = self.pb.join_squad(str(squad_code))
+        ok = await self.conn.send_online(join_pkt)
+        if not ok:
+            self.stats.join_failures += 1
+            logger.error("Join failed — online socket dead")
+            return
+
+        # Wait for join confirmation
+        await asyncio.sleep(self.join_delay)
+
+        # Read any join response
+        join_resp = await self.conn.recv_online(timeout=2.0)
+        if join_resp:
+            self.conn.reset_ka_watchdog()
+            logger.info(f"Join response: {len(join_resp)} bytes")
+
+        logger.info(f"Joined squad on ONLINE channel")
         if self._stop_requested:
             return
 
-        # ── Step 2: Start match (send 269 + 214, then spam field 9 ready) ──
+        # ── Step 4: Start match (269 + 214 + 9 on ONLINE only) ──
         self.stats.current_state = "matching"
 
-        # Send the actual match-start commands (field 269 + 214) — these trigger matchmaking
-        start_detailed = self.pb.start_match_detailed(self.uid)
-        start_simple = self.pb.start_match_simple()
-        ready_packet = self.pb.start_match_ready(self.uid)
-
-        # Send 269 (detailed start) on both channels
-        await self.conn.send_online(start_detailed)
-        await self.conn.send_whisper(start_detailed)
-        logger.info(f"Sent field 269 (detailed start) on both channels")
-
+        pkt_269 = self.pb.start_match_detailed(self.uid)
+        await self.conn.send_online(pkt_269)
+        logger.info("Sent field 269 (detailed start) on ONLINE")
         await asyncio.sleep(0.5)
 
-        # Send 214 (simple start) on both channels
-        await self.conn.send_online(start_simple)
-        await self.conn.send_whisper(start_simple)
-        logger.info(f"Sent field 214 (simple start) on both channels")
-
+        pkt_214 = self.pb.start_match_simple()
+        await self.conn.send_online(pkt_214)
+        logger.info("Sent field 214 (simple start) on ONLINE")
         await asyncio.sleep(0.5)
 
-        # Now spam field 9 (ready signal) for the duration
+        # Spam field 9 (ready) on ONLINE only
+        pkt_9 = self.pb.start_match_ready(self.uid)
         end_time = time.time() + self.spam_duration
-        packets_sent = 2  # Already sent 269 + 214
+        packets_sent = 2
 
         while time.time() < end_time and not self._stop_requested:
-            await self.conn.send_online(ready_packet)
-            packets_sent += 1
-            await asyncio.sleep(self.spam_delay)
+            ok = await self.conn.send_online(pkt_9)
+            if ok:
+                packets_sent += 1
+            else:
+                logger.warning(f"Send failed at packet {packets_sent} — connection dead")
+                self.conn.connected = False
+                break
+            jitter = random.uniform(self.spam_delay * 0.8, self.spam_delay * 1.5)
+            await asyncio.sleep(jitter)
 
         self.stats.matches_started += 1
-        logger.info(f"Match start packets sent: {packets_sent}")
+        logger.info(f"Match start: {packets_sent} packets sent")
 
         if self._stop_requested:
-            # Still try to leave before stopping
-            leave_packet = self.pb.leave_team(self.uid)
-            try:
-                await self.conn.send_whisper(leave_packet)
-            except Exception:
-                pass
+            await self.conn.send_online(self.pb.leave_squad(self.uid))
             return
 
-        # ── Step 3: Wait for match to complete ──
+        # ── Step 5: Wait for match (read both channels) ──
         self.stats.current_state = "waiting"
-        logger.info(f"Waiting {self.wait_after_match}s for match completion...")
-        await asyncio.sleep(self.wait_after_match)
+        logger.info(f"Waiting {self.wait_after_match}s for match...")
 
-        # ── Step 4: Leave team ──
+        wait_end = time.time() + self.wait_after_match
+        while time.time() < wait_end and self.conn.connected:
+            online_data = await self.conn.recv_online(timeout=1.0)
+            if online_data:
+                self.conn.reset_ka_watchdog()
+                logger.info(f"Online data: {len(online_data)} bytes, hex={online_data[:12].hex()}")
+            whisper_data = await self.conn.recv_whisper(timeout=1.0)
+            if whisper_data:
+                self.conn.reset_ka_watchdog()
+                logger.info(f"Chat data: {len(whisper_data)} bytes, hex={whisper_data[:12].hex()}")
+
+        if not self.conn.connected:
+            logger.warning("Connection lost during wait")
+            return
+
+        # ── Step 6: Leave squad on ONLINE ──
         self.stats.current_state = "leaving"
         self.stats.leave_attempts += 1
-        leave_packet = self.pb.leave_team(self.uid)
-        await self.conn.send_whisper(leave_packet)
-        await asyncio.sleep(self.leave_delay)
-        logger.info("Left team")
 
-        # ── Step 5: Brief delay before next cycle ──
+        ok = await self.conn.send_online(self.pb.leave_squad(self.uid))
+        if not ok:
+            self.stats.leave_failures += 1
+        await asyncio.sleep(self.leave_delay)
+        logger.info("Left squad on ONLINE channel")
+
+        # ── Step 7: Cycle delay ──
         self.stats.cycles_completed += 1
-        self.stats.uptime_seconds = time.time() - (time.time() - self.stats.uptime_seconds)
+        self.stats.uptime_seconds = time.time() - start_time
         if self._on_progress:
             self._on_progress(self.stats)
 
         if not self._stop_requested:
             await asyncio.sleep(self.cycle_delay)
 
-    async def send_chat(self, text: str):
-        """Send a chat message in-game (uses whisper socket)."""
-        if self._sender_uid:
-            msg_packet = self.pb.chat_message(text, self._sender_uid)
-            await self.conn.send_whisper(msg_packet)
+    def _parse_squad_code(self, data: bytes) -> Optional[str]:
+        """Parse squad_code from OpEnSq response (0500 packet).
+        Looks for the squad_code string in the response data."""
+        try:
+            from .xC4 import DeCode_PackEt
+            import json
+            hex_data = data.hex()
+
+            # Find 0500 packet marker
+            idx = hex_data.find("0500")
+            if idx < 0:
+                return None
+
+            # Parse the protobuf data after the header
+            payload = hex_data[idx + 12:]  # Skip 6-byte header
+            decoded = DeCode_PackEt(payload)
+            if decoded:
+                parsed = json.loads(decoded)
+                # squad_code is in field 5.31 (squad_code) or 5.5 (team_code)
+                f5 = parsed.get("5", {})
+                if isinstance(f5, dict):
+                    f5_data = f5.get("data", f5)
+                    if isinstance(f5_data, dict):
+                        # Try field 31 (squad_code)
+                        f31 = f5_data.get("31", {})
+                        if isinstance(f31, dict):
+                            code = f31.get("data", "")
+                            if code:
+                                return str(code)
+                        # Try field 5 (team_code as number)
+                        f5_5 = f5_data.get("5", {})
+                        if isinstance(f5_5, dict):
+                            code = f5_5.get("data", "")
+                            if code:
+                                return str(code)
+        except Exception as e:
+            logger.debug(f"Squad code parse error: {e}")
+        return None
